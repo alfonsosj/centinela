@@ -67,7 +67,7 @@ public class MainActivity extends Activity {
    box.setOrientation(1);box.setPadding(24,32,24,36);sc.addView(box);setContentView(sc);
    TextView h=new TextView(this);h.setText("MAZDA AVISOS LAB");
    h.setTextSize(24);h.setTextColor(Color.rgb(22,48,75));box.addView(h);
-   line("Versión 0.7 experimental: permite escucha MQTT durante 90 minutos con la pantalla apagada y reconexión mientras esté activa. No es vigilancia permanente ni sustituye una alarma del coche.");
+   line("Versión 0.8 experimental: mejora la recuperación ante cambios de red y muestra el estado reciente de escucha. Sesiones de 90 minutos, no vigilancia 24/7 ni alarma de seguridad.");
    line((enabled()?"✓":"○")+" Accesibilidad: "+(enabled()?"activada":"desactivada"));
    button("1. Activar accesibilidad",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
    if(Build.VERSION.SDK_INT>=33){
@@ -80,6 +80,7 @@ public class MainActivity extends Activity {
    }
    line("Nuevo: en el panel de ajustes rápidos de Samsung, pulsa Editar botones y añade «Comprobar Mazda». Funciona cuando tú pulsas el botón, con el móvil desbloqueado.");
    line("Monitor MQTT de prueba: "+MqttSessionService.currentStatus(this));
+   button("Actualizar estado del monitor",this::show);
    button("Configurar / iniciar MQTT con cuenta secundaria",()->startActivity(new Intent(this,ConnectionTestActivity.class)));
    button("Detener monitor MQTT",()->{startService(new Intent(this,MqttSessionService.class).setAction(MqttSessionService.ACTION_STOP));line("Detención solicitada.");});
    button("Comprobar mensajes de Mazda ahora (PRUEBA)",()->launchMazda(true));

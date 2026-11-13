@@ -35,10 +35,15 @@ final class MqttProbe {
  private static Frame read(InputStream in)throws IOException{
    int h=in.read();if(h<0)throw new EOFException("Conexión MQTT cerrada");
    int size=0,shift=1;boolean end=false;
-   for(int n=0;n<4;n++){int b=in.read();if(b<0)throw new EOFException("Trama incompleta");
-     size+=(b&127)*shift;if((b&128)==0){end=true;break;}shift*=128;}
+   try{
+     for(int n=0;n<4;n++){int b=in.read();if(b<0)throw new EOFException("Trama incompleta");
+       size+=(b&127)*shift;if((b&128)==0){end=true;break;}shift*=128;}
+   }catch(java.net.SocketTimeoutException e){throw new IOException("Cabecera MQTT incompleta",e);}
    if(!end||size>1024*1024)throw new IOException("Trama MQTT inválida");
-   byte[] bytes=new byte[size];new DataInputStream(in).readFully(bytes);return new Frame(h,bytes);
+   byte[] bytes=new byte[size];
+   try{new DataInputStream(in).readFully(bytes);}
+   catch(java.net.SocketTimeoutException e){throw new IOException("Trama MQTT incompleta; reconexión necesaria",e);}
+   return new Frame(h,bytes);
  }
  private static class Frame{int header;byte[] data;Frame(int h,byte[] d){header=h;data=d;}int type(){return header>>4;}}
  private static class Msg{String topic;JSONObject json;int packetId;boolean retained;}
@@ -192,10 +197,16 @@ final class MqttProbe {
      s.setSoTimeout(4000);
      long until=SystemClock.elapsedRealtime()+seconds*1000L;
      long ping=SystemClock.elapsedRealtime()+20000,update=SystemClock.elapsedRealtime()+10000;
+     long pongDeadline=0;
      while(!stopped&&SystemClock.elapsedRealtime()<until){
        long t=SystemClock.elapsedRealtime();
-       if(t>ping){out.write(new byte[]{(byte)0xc0,0});out.flush();ping=t+20000;}
-       try{Frame f=read(in);if(f.type()==3){Msg m=parse(f);ack(out,m);
+       if(pongDeadline>0&&t>pongDeadline)throw new IOException("Sin respuesta al heartbeat MQTT");
+       if(t>ping&&pongDeadline==0){
+         out.write(new byte[]{(byte)0xc0,0});out.flush();
+         pongDeadline=t+35000;ping=t+20000;
+       }
+       try{Frame f=read(in);if(f.type()==13)pongDeadline=0;
+          if(f.type()==3){Msg m=parse(f);ack(out,m);
           if(subs.contains(m.topic))handle(m);}
           if(f.type()==14)throw new IOException("El broker cortó la conexión");
        }catch(java.net.SocketTimeoutException expected){}

@@ -1,18 +1,19 @@
-# Mazda Avisos Lab v0.7 — monitor MQTT temporal con pantalla apagada
+# Mazda Avisos Lab v0.8 — recuperación de red y diagnóstico
 
-Versión experimental. Mantiene la v0.6 (lectura del Centro de Mensajes, tile Android y escucha MQTT 2 min) y añade una sesión en primer plano de hasta 90 minutos.
+Mantiene la escucha directa de eventos por MQTT y las notificaciones de bloqueo/desbloqueo ya comprobadas en la versión anterior.
+
+## Mejoras
+- Durante una sesión de primer plano de **máximo 90 minutos**, observa cambios de red mediante el callback de Android (Wi-Fi, datos móviles, pérdida y recuperación) y fuerza reconexión cuando corresponde.
+- Usa latidos MQTT (PINGREQ/PINGRESP); reconecta si el broker deja de responder.
+- Muestra el tipo de red en el estado del monitor y guarda **únicamente** un diagnóstico de actividad reciente, reconexiones y marca temporal. **No guarda tokens, contraseñas ni contenidos MQTT.**
+- Desde la pantalla principal, «Actualizar estado del monitor» detecta cuándo la última señal tiene más de 90 segundos y advierte de que no se puede confirmar la escucha.
+- Añade esperas de reconexión con retroceso corto y pausa cuando no hay red.
 
 ## Prueba
-1. Instala v0.7, asegurando los permisos Android de notificaciones y accesibilidad si usas Centro de Mensajes.
-2. Abre «Configurar / iniciar MQTT con cuenta secundaria».
-3. Autentica exclusivamente tu cuenta de pruebas y pulsa **Iniciar monitor en segundo plano (90 minutos)**.
-4. Verifica que aparece la notificación persistente «Mazda Avisos Lab · MQTT», apaga la pantalla y cambia el cierre del CX-6e desde la app oficial.
-5. Deberían recibirse alertas Android cuando cambie el estado del cierre, incluso con la pantalla apagada. En la notificación persistente se puede pulsar Detener.
+Instala v0.8 y autoriza la cuenta secundaria. Inicia «monitor en segundo plano (90 minutos)». Cambia de Wi-Fi a datos móviles apagando Wi-Fi desde los ajustes rápidos y espera el estado «Cambio de red» o «Conectando por datos móviles». Repite la prueba de bloqueo del vehículo; mantén siempre visible la notificación persistente. Después enciende Wi-Fi para verificar la nueva reconexión.
 
-## Privacidad y límites
-- Una conexión MQTT TLS de solo lectura al broker entregado por Mazda Europa; suscribe reportes de estado y eventos.
-- Los tokens y la configuración del broker se mantienen solo en memoria, no en preferencias ni en GitHub; deben reintroducirse tras detener/reiniciar la app.
-- Android 15+ limita el uso diario de servicios de primer plano del tipo dataSync; no podemos prometer 24/7 ni funcionamiento indefinido. La sesión se detiene a los 90 minutos como máximo y puede ser interrumpida antes por el sistema.
-- Reconexión automática limitada durante la sesión si se corta Internet, siempre que sigan siendo válidas las credenciales MQTT.
-- No se han verificado eventos de ocupantes en events/up; **no sustituye notificaciones ni sistemas de seguridad del vehículo**.
-- Por la firma debug diferente, es posible que sea necesario desinstalar solo Mazda Avisos Lab v0.6 (perdiendo su historial local) antes de instalar v0.7. La app Mazda oficial no se modifica.
+## Límites importantes
+- Android restringe el tiempo acumulado de servicios de primer plano `dataSync`: **máximo 6 horas por 24 horas** al orientar la app a Android 15+; la sesión de 90 minutos puede terminar antes. No existe autoarranque tras reiniciar el móvil, y no se promete cobertura 24/7.
+- Los mensajes de detección de ocupantes que muestra la app oficial **todavía no se han identificado** en `events/up`.
+- No hay comandos de control sobre el vehículo. La notificación por cambio de cierre está clasificada como experimental.
+- Si cambia la firma de desarrollo debug, desinstala solamente Mazda Avisos Lab antes de instalar la nueva APK; no desinstales Mazda oficial.
