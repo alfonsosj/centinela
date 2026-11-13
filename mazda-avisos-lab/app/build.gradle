@@ -6,8 +6,25 @@ android {
         applicationId 'es.retalis.mazdaavisos'
         minSdk 26
         targetSdk 35
-        versionCode 12
-        versionName '0.12-experimental'
+        versionCode 13
+        versionName '0.13-experimental'
     }
+    // Signing material is only available via Actions encrypted secret.
+    def signDir = System.getenv('MAZDA_SIGNING_DIR')
+    signingConfigs {
+      stable {
+        if (signDir != null && !signDir.isEmpty()) {
+          storeFile file(signDir + '/mazda_release.p12')
+          storePassword file(signDir + '/store_password.txt').text.trim()
+          keyAlias 'mazdaavisos'
+          keyPassword storePassword
+          storeType 'pkcs12'
+        }
+      }
+    }
+    buildTypes { release {
+      if (signDir != null && !signDir.isEmpty()) signingConfig signingConfigs.stable
+      minifyEnabled false
+    }}
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }

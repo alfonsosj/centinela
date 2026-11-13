@@ -84,6 +84,62 @@ final class VehicleSnapshot {
    }
    e.apply();
  }
+ /** Initial authoritative status snapshot from Mazda's EU HTTPS vehicle API. */
+ static boolean observeApi(Context context,JSONObject data){
+   if(data==null)return false;
+   SharedPreferences prefs=context.getSharedPreferences(PREF,Context.MODE_PRIVATE);
+   SharedPreferences.Editor edit=prefs.edit();
+   boolean updated=false;
+   JSONObject vs=data.optJSONObject("vehicleStatus");
+   if(vs!=null){
+     Double soc=number(vs,"soc",0,100);
+     if(soc!=null){edit.putFloat("soc",soc.floatValue());updated=true;}
+     Double mileage=number(vs,"drvMileage",0,1500);
+     if(mileage!=null){edit.putFloat("range",mileage.floatValue());updated=true;}
+     Integer parked=code(vs,"status",1,2);
+     if(parked!=null){edit.putInt("parked",parked==2?1:0);updated=true;}
+   }
+   JSONObject hvac=data.optJSONObject("hvac");
+   if(hvac!=null){
+     Double t=number(hvac,"insideTemp",-500,800);
+     if(t!=null&&t!=0){edit.putFloat("temp",(float)(t/10.0));updated=true;}
+   }
+   JSONObject door=data.optJSONObject("door");
+   if(door!=null){
+     Integer locked=code(door,"driverLock",0,1);
+     if(locked!=null){edit.putInt("lock",locked);updated=true;}
+   }
+   JSONObject charge=data.optJSONObject("charge");
+   if(charge!=null){
+     Integer mode=code(charge,"chargeStatus",-1,10);
+     if(mode!=null){
+       if(mode==0)edit.putInt("charge",0);
+       else if(mode==6)edit.putInt("charge",1);
+       else if(mode==1)edit.putInt("charge",2);
+       updated=true;
+     }
+   }
+   JSONObject window=data.optJSONObject("window");
+   if(window!=null){
+     org.json.JSONArray arr=window.optJSONArray("windows");
+     if(arr!=null){
+       int known=0,open=0;
+       for(int i=0;i<4;i++){
+         Object v=arr.opt(i);
+         try{
+           double n=Double.parseDouble(String.valueOf(v));
+           if(n>=0&&n<=100&&Double.isFinite(n)){
+             int code=n==0?0:1;edit.putInt("window_"+i,code);
+             known++;if(code==1)open++;
+           }
+         }catch(Exception ignored){}
+       }
+       if(known>0){edit.putInt("windows_known",known).putInt("windows_open",open);updated=true;}
+     }
+   }
+   if(updated){edit.putLong("last_data_at",System.currentTimeMillis());edit.apply();}
+   return updated;
+ }
  String age(){
    if(lastDataAt<=0)return "Sin datos recibidos todavía";
    long secs=Math.max(0,(System.currentTimeMillis()-lastDataAt)/1000L);

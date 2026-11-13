@@ -182,15 +182,34 @@ public class ConnectionTestActivity extends Activity {
          }
        }
      }
-     if(authReady && cfg!=null && reports>0){mqttConfig=cfg;mqttSecret=auth.optString("authToken");runOnUiThread(()->{listenButton.setVisibility(View.VISIBLE);sessionButton.setVisibility(View.VISIBLE);});}
-     say("PRUEBA TERMINADA\n\nVehículos visibles: "+vehicles.length()+
+     if(authReady && cfg!=null && reports>0){mqttConfig=cfg;mqttSecret=auth.optString("authToken");runOnUiThread(()->{listenButton.setVisibility(View.VISIBLE);sessionButton.setVisibility(View.VISIBLE);});}      String initialInfo=readInitialVehicleStatus(carId);
+      say("PRUEBA TERMINADA\n\nVehículos visibles: "+vehicles.length()+
        "\nConfiguración THU: disponible"+
        "\nAutorización MQTT: "+(authReady?"concedida":"no confirmada")+
        "\nCanales properties/report: "+reports+
-       "\nCanales events/up: "+events+
+       "\nCanales events/up: "+events+"\n"+initialInfo+
        "\n\nSi la autorización fue concedida, pulsa «Escuchar MQTT» para una prueba de 2 minutos.");
      token=null;
    }catch(Exception ex){token=null;say("Sesión iniciada, pero falló el diagnóstico MQTT: "+safeError(ex));}
+ }
+ private String readInitialVehicleStatus(String carId){
+   try{
+     Object id=carId;
+     if(carId.matches("[0-9]{1,18}"))id=Long.parseLong(carId);
+     JSONObject criteria=new JSONObject()
+       .put("seat","1").put("tire","1").put("charge","1").put("vehicleStatus","1")
+       .put("hvac","1").put("window","1").put("door","1").put("lamp","1")
+       .put("departurePlan","0").put("fuel","0").put("airConditionPlan","0")
+       .put("warmCoolingBox","0").put("welcome","0").put("location","0");
+     JSONObject body=new JSONObject().put("vechileCriteria",criteria).put("vehicleId",id);
+     JSONObject result=post(EU+"/cma-app-car-condition/api/vehicle/condition/v2",body,false);
+     boolean loaded=VehicleSnapshot.observeApi(this,result.optJSONObject("data"));
+     VehicleSnapshot snap=VehicleSnapshot.read(this);
+     return loaded?"Lectura inicial: batería "+snap.socText()+"; temperatura "+snap.tempText()+"."
+       :"Lectura inicial: todavía sin datos reconocidos.";
+   }catch(Exception ignored){
+     return "Lectura inicial: no disponible para esta cuenta; MQTT seguirá conectado.";
+   }
  }
  private void startSession(){
    if(mqttConfig==null||mqttSecret==null||mqttSecret.isEmpty()){say("Primero autoriza la cuenta secundaria.");return;}
