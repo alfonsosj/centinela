@@ -19,10 +19,15 @@ final class MqttProbe {
  private final JSONObject cfg; private final String pass; private final Context app;
  private final List<String> subs=new ArrayList<>(); private String loginIn,loginOut,identity,host,secret;
  private SSLSocket socket; private int reports=0,events=0,doorChanges=0; private Integer lock=null;
+ private final AlertRules alerts;
  private boolean warnedEvent=false; private volatile boolean stopped=false;
- MqttProbe(Context ctx,JSONObject config,String auth){app=ctx.getApplicationContext();cfg=config;pass=auth;}
- void setInitialDoorLock(Integer value){if(value!=null&&(value==0||value==1))lock=value;}
- Integer getLastDoorLock(){return lock;}
+ MqttProbe(Context ctx,JSONObject config,String auth){this(ctx,config,auth,null);}
+ MqttProbe(Context ctx,JSONObject config,String auth,AlertRules shared){
+   app=ctx.getApplicationContext();cfg=config;pass=auth;
+   alerts=shared!=null?shared:new AlertRules(app);
+ }
+ void setInitialDoorLock(Integer value){if(value!=null&&(value==0||value==1))alerts.setInitialDoorLock(value);}
+ Integer getLastDoorLock(){return alerts.getLastDoorLock();}
  void close(){stopped=true;try{if(socket!=null)socket.close();}catch(Exception ignored){}}
  private static String str(byte[] data){return new String(data,StandardCharsets.UTF_8);}
  private static void utf(ByteArrayOutputStream b,String s)throws IOException{
@@ -150,25 +155,16 @@ final class MqttProbe {
      }
    }
    if(m.topic.endsWith("/properties/report")){
-     reports++;JSONObject parsed=values(m.json);
-     Object value=parsed.opt("driverDoorLock");
-     if(value instanceof Number){
-       int newState=((Number)value).intValue();
-       if(newState==0||newState==1){
-         if(lock!=null&&newState!=lock){
-           doorChanges++;
-           MainActivity.alert(app,newState==0?"Puertas bloqueadas":"Puertas desbloqueadas",
-             "Cambio detectado por MQTT en el CX-6e. Aviso experimental.",2402+doorChanges%10);
-         }
-         lock=newState;
-       }
-     }
+     reports++;
+     JSONObject parsed=values(m.json);
+     alerts.ingest(parsed);
+     doorChanges=alerts.getLockChanges();
    }
  }
  private String status(){return "MQTT conectado\nInformes properties/report: "+reports+
    "\nEventos events/up: "+events+"\nCambios de cierre confirmados: "+doorChanges+
    "\nAviso de evento genérico: "+(warnedEvent?"enviado":"ninguno")+
-   "\nEscucha temporal: no es una alarma de seguridad.";}
+   "\n"+alerts.summary()+"\nMonitor experimental: no es una alarma de seguridad.";}
  void run(Status feedback,int seconds)throws Exception{
    prepare();feedback.update("Conectando a MQTT Europa...");
    try{

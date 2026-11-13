@@ -37,6 +37,7 @@ public final class MqttSessionService extends Service {
  private long lastNotify=0;
  private int reconnects=0;
  private Integer lastDoorLock=null;
+ private AlertRules sharedAlerts;
 
  public static String currentStatus(Context context){
    android.content.SharedPreferences p=context.getSharedPreferences(PREF,MODE_PRIVATE);
@@ -164,6 +165,7 @@ public final class MqttSessionService extends Service {
    String finishReason="Sesión finalizada.";
    try {
      JSONObject cfg=new JSONObject(config);
+     sharedAlerts=new AlertRules(this);
      // Sin límite propio de 90 minutos. El servicio continúa mientras Android lo autorice.
      // Cada 4 h se recrea la sesión MQTT con autorización aún válida; si expira el token
      // se informa de la interrupción, sin guardar contraseñas ni tokens en disco.
@@ -176,7 +178,7 @@ public final class MqttSessionService extends Service {
        }
        networkChanged=false;
        try{
-         MqttProbe p=new MqttProbe(this,cfg,auth);
+         MqttProbe p=new MqttProbe(this,cfg,auth,sharedAlerts);
          probe=p;
          p.setInitialDoorLock(lastDoorLock);
          state("Conectando por "+networkLabel()+"...",true);
