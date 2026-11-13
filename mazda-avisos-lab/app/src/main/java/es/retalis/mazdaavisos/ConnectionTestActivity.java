@@ -182,7 +182,8 @@ public class ConnectionTestActivity extends Activity {
          }
        }
      }
-     if(authReady && cfg!=null && reports>0){mqttConfig=cfg;mqttSecret=auth.optString("authToken");runOnUiThread(()->{listenButton.setVisibility(View.VISIBLE);sessionButton.setVisibility(View.VISIBLE);});}      String initialInfo=readInitialVehicleStatus(carId);
+     if(authReady && cfg!=null && reports>0){mqttConfig=cfg;mqttSecret=auth.optString("authToken");runOnUiThread(()->{listenButton.setVisibility(View.VISIBLE);sessionButton.setVisibility(View.VISIBLE);});}
+     String initialInfo=readInitialVehicleStatus(carId);
       say("PRUEBA TERMINADA\n\nVehículos visibles: "+vehicles.length()+
        "\nConfiguración THU: disponible"+
        "\nAutorización MQTT: "+(authReady?"concedida":"no confirmada")+

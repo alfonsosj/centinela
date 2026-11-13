@@ -1,4 +1,4 @@
-name: Compilar Mazda Avisos Lab APK
+name: Compilar Mazda Avisos Lab con firma estable
 on:
   push:
     branches: [mazda-avisos-lab-build]
@@ -20,7 +20,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Configurar SDK Android instalado en GitHub runner
+      - name: Configurar SDK Android
         shell: bash
         run: |
           echo "ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
@@ -28,11 +28,41 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Compilar APK debug
-        run: gradle --no-daemon --stacktrace :app:assembleDebug
-      - name: Guardar APK
+      - name: Comprobar compilación sin distribuir firma debug
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Restaurar clave estable desde GitHub Actions Secrets
+        env:
+          SIGNING_BUNDLE: ${{ secrets.MAZDA_SIGNING_BUNDLE_B64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$SIGNING_BUNDLE" ]]; then
+            echo "::error::Configura el secreto MAZDA_SIGNING_BUNDLE_B64. No se distribuirá una APK debug con firma distinta."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/mazda-sign"
+          printf '%s' "$SIGNING_BUNDLE" | base64 --decode > "$RUNNER_TEMP/mazda-sign/bundle.zip"
+          unzip -q "$RUNNER_TEMP/mazda-sign/bundle.zip" -d "$RUNNER_TEMP/mazda-sign"
+          test -s "$RUNNER_TEMP/mazda-sign/mazda_release.p12"
+          test -s "$RUNNER_TEMP/mazda-sign/store_password.txt"
+          chmod 600 "$RUNNER_TEMP/mazda-sign/mazda_release.p12" "$RUNNER_TEMP/mazda-sign/store_password.txt"
+          echo "MAZDA_SIGNING_DIR=$RUNNER_TEMP/mazda-sign" >> "$GITHUB_ENV"
+      - name: Compilar APK release firmada de forma permanente
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+      - name: Verificar firma de la APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          apksigner_bin="${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/35.0.0/apksigner"
+          "$apksigner_bin" verify --verbose app/build/outputs/apk/release/app-release.apk
+          "$apksigner_bin" verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -E 'Signer #1 certificate SHA-256 digest'
+      - name: Guardar únicamente APK release con firma estable
         uses: actions/upload-artifact@v4
         with:
-          name: Mazda-Avisos-Lab-APK
-          path: mazda-avisos-lab/app/build/outputs/apk/debug/app-debug.apk
+          name: Mazda-Avisos-Lab-APK-Firma-Estable
+          path: mazda-avisos-lab/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+      - name: Borrar clave del runner
+        if: always()
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/mazda-sign"
