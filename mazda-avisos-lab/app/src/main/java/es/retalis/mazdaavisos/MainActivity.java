@@ -15,7 +15,6 @@ import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -34,7 +33,10 @@ public class MainActivity extends Activity {
    if(Build.VERSION.SDK_INT>=33&&c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return;
    Intent i=new Intent(c,MainActivity.class);
    PendingIntent pi=PendingIntent.getActivity(c,0,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-   Notification n=new Notification.Builder(c,CHANNEL).setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(body).setStyle(new Notification.BigTextStyle().bigText(body)).setContentIntent(pi).setAutoCancel(true).build();
+   Notification n=new Notification.Builder(c,CHANNEL).setSmallIcon(android.R.drawable.ic_dialog_info)
+     .setContentTitle(title).setContentText(body)
+     .setStyle(new Notification.BigTextStyle().bigText(body))
+     .setContentIntent(pi).setAutoCancel(true).build();
    nm.notify(id,n);
  }
  boolean enabled(){
@@ -45,35 +47,57 @@ public class MainActivity extends Activity {
    return false;
  }
  void line(String text){
-   TextView t=new TextView(this);t.setText(text);t.setTextSize(15);t.setTextColor(Color.rgb(35,45,55));t.setPadding(0,12,0,12);box.addView(t);
+   TextView t=new TextView(this);t.setText(text);t.setTextSize(15);
+   t.setTextColor(Color.rgb(35,45,55));t.setPadding(0,12,0,12);box.addView(t);
  }
- void button(String text,Runnable r){Button b=new Button(this);b.setText(text);b.setAllCaps(false);box.addView(b);b.setOnClickListener(v->r.run());}
+ void button(String text,Runnable r){
+   Button b=new Button(this);b.setText(text);b.setAllCaps(false);
+   box.addView(b);b.setOnClickListener(v->r.run());
+ }
+ private void launchMazda(boolean scan){
+   if(scan&&!enabled()){line("Primero activa el permiso de accesibilidad.");return;}
+   Intent i=getPackageManager().getLaunchIntentForPackage("com.cma.mazda.eu");
+   if(i==null){line("La app Mazda europea no está instalada.");return;}
+   if(scan){MazdaMonitor.requestSingleCheck();Data.status(this,"Comprobación solicitada; abriendo Mazda...");}
+   else MazdaMonitor.stopCheck();
+   startActivity(i);
+ }
  void show(){
-   ScrollView sc=new ScrollView(this);box=new LinearLayout(this);box.setOrientation(1);box.setPadding(24,32,24,36);sc.addView(box);setContentView(sc);
-   TextView h=new TextView(this);h.setText("MAZDA AVISOS LAB");h.setTextSize(24);h.setTextColor(Color.rgb(22,48,75));box.addView(h);
-   line("Versión 0.2 experimental. Solo detecta mensajes cuando abres Centro de Mensajes en la app Mazda. No consulta el vehículo ni sus servidores.");
+   ScrollView sc=new ScrollView(this);box=new LinearLayout(this);
+   box.setOrientation(1);box.setPadding(24,32,24,36);sc.addView(box);setContentView(sc);
+   TextView h=new TextView(this);h.setText("MAZDA AVISOS LAB");
+   h.setTextSize(24);h.setTextColor(Color.rgb(22,48,75));box.addView(h);
+   line("Versión 0.3 experimental: prueba de acceso al Centro de Mensajes con un toque. No consulta servicios de Mazda con el móvil bloqueado ni lee mensajes sin abrir la app oficial.");
    line((enabled()?"✓":"○")+" Accesibilidad: "+(enabled()?"activada":"desactivada"));
-   button("1. Activar servicio de accesibilidad",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
+   button("1. Activar accesibilidad",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
    if(Build.VERSION.SDK_INT>=33){
      line((checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED?"✓":"○")+" Notificaciones");
      button("2. Permitir notificaciones",()->{
-       if(checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},11);
+       if(checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)
+         requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},11);
        else startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));
      });
    }
+   button("Comprobar mensajes de Mazda ahora (PRUEBA)",()->launchMazda(true));
+   line("Abre Mazda e intenta pulsar solo el botón de mensajes si Android identifica su ID. Si no lo encuentra, toca el botón de mensajes manualmente; la app guardará un diagnóstico.");
+   button("Abrir Mazda sin automatización",()->launchMazda(false));
    button("Probar notificación",()->alert(this,"Prueba Mazda Avisos Lab","Notificación de prueba, no es un aviso real del coche.",99));
-   button("Abrir Mazda oficial",()->{Intent i=getPackageManager().getLaunchIntentForPackage("com.cma.mazda.eu");if(i!=null)startActivity(i);else line("La app oficial Mazda no está instalada.");});
    line("Última lectura: "+Data.last(this));
    line("Mensajes almacenados:");
    List<String> messages=Data.history(this);if(messages.isEmpty())line("Sin mensajes todavía.");
    for(String m:messages)line("• "+m);
    button("Actualizar historial",this::show);
-   button("Copiar diagnóstico",()->{
+   button("Copiar diagnóstico técnico",()->{
      ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
      if(cb!=null)cb.setPrimaryClip(ClipData.newPlainText("Diagnóstico Mazda",Data.diagnostic(this)));
    });
-   button("Borrar historial local",()->new android.app.AlertDialog.Builder(this).setTitle("Borrar historial").setMessage("Se borrarán los mensajes y la siguiente lectura no generará alertas de los anteriores.").setPositiveButton("Borrar",(a,b)->{Data.clear(this);show();}).setNegativeButton("Cancelar",null).show());
-   line("Privacidad: sin permiso de Internet. El texto se guarda solo en este teléfono. No uses esta app como único sistema de avisos de seguridad.");
+   button("Borrar historial local",()->new android.app.AlertDialog.Builder(this).setTitle("Borrar historial")
+     .setMessage("Se borrarán los mensajes. La siguiente lectura será importación sin avisos.")
+     .setPositiveButton("Borrar",(a,b)->{Data.clear(this);show();})
+     .setNegativeButton("Cancelar",null).show());
+   line("Privacidad: sin permiso de Internet. El texto de los mensajes se guarda solo en este teléfono. La navegación automática se activa únicamente al pulsar el botón de prueba y caduca en 30 segundos. No sustituye las alertas de seguridad del vehículo.");
  }
- @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);show();}
+ @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){
+   super.onRequestPermissionsResult(request,permissions,results);show();
+ }
 }

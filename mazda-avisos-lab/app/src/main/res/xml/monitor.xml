@@ -3,6 +3,7 @@
  android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewScrolled"
  android:packageNames="com.cma.mazda.eu"
  android:accessibilityFeedbackType="feedbackGeneric"
+ android:accessibilityFlags="flagReportViewIds"
  android:notificationTimeout="350"
  android:canRetrieveWindowContent="true"
  android:description="@string/accessibility_description"/>
