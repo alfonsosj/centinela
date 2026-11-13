@@ -21,6 +21,8 @@ final class MqttProbe {
  private SSLSocket socket; private int reports=0,events=0,doorChanges=0; private Integer lock=null;
  private boolean warnedEvent=false; private volatile boolean stopped=false;
  MqttProbe(Context ctx,JSONObject config,String auth){app=ctx.getApplicationContext();cfg=config;pass=auth;}
+ void setInitialDoorLock(Integer value){if(value!=null&&(value==0||value==1))lock=value;}
+ Integer getLastDoorLock(){return lock;}
  void close(){stopped=true;try{if(socket!=null)socket.close();}catch(Exception ignored){}}
  private static String str(byte[] data){return new String(data,StandardCharsets.UTF_8);}
  private static void utf(ByteArrayOutputStream b,String s)throws IOException{

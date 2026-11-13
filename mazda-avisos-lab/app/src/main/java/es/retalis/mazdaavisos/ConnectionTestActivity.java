@@ -60,7 +60,7 @@ public class ConnectionTestActivity extends Activity {
    LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(28,36,28,32);scroll.addView(root);setContentView(scroll);
    TextView title=new TextView(this);title.setText("PRUEBA MQTT · MAZDA EUROPA");title.setTextSize(21);root.addView(title);
    TextView info=new TextView(this);
-   info.setText("Solo cuenta compartida de pruebas. Las credenciales viajan cifradas por HTTPS a Mazda Europa y no se guardan en el dispositivo ni en GitHub. NO introduzcas tu cuenta principal. Esta versión permite la escucha MQTT de dos minutos o una sesión de 90 minutos con una notificación de primer plano. No es una alarma de seguridad.");
+   info.setText("Solo cuenta compartida de pruebas. Las credenciales viajan cifradas por HTTPS a Mazda Europa y no se guardan en el dispositivo ni en GitHub. NO introduzcas tu cuenta principal. Esta versión permite una escucha MQTT de dos minutos o un monitor continuo experimental con notificación visible. No usa Home Assistant, no se reinicia sola tras apagar el móvil y no sustituye las alertas de seguridad.");
    info.setPadding(0,18,0,18);root.addView(info);
    emailField=new EditText(this);emailField.setSingleLine(true);emailField.setHint("Correo cuenta secundaria");emailField.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);root.addView(emailField);
    passwordField=new EditText(this);passwordField.setSingleLine(true);passwordField.setHint("Contraseña de cuenta secundaria");passwordField.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);root.addView(passwordField);
@@ -68,7 +68,7 @@ public class ConnectionTestActivity extends Activity {
    codeField=new EditText(this);codeField.setHint("Código recibido por email");codeField.setInputType(InputType.TYPE_CLASS_NUMBER);codeField.setVisibility(View.GONE);root.addView(codeField);
    verifyButton=new Button(this);verifyButton.setText("2. Verificar dispositivo y consultar MQTT");verifyButton.setVisibility(View.GONE);root.addView(verifyButton);verifyButton.setOnClickListener(v->verify());
    listenButton=new Button(this);listenButton.setText("Escuchar MQTT durante 2 minutos");listenButton.setVisibility(View.GONE);root.addView(listenButton);listenButton.setOnClickListener(v->listen());
-   sessionButton=new Button(this);sessionButton.setText("Iniciar monitor en segundo plano (90 minutos)");sessionButton.setVisibility(View.GONE);root.addView(sessionButton);sessionButton.setOnClickListener(v->startSession());
+   sessionButton=new Button(this);sessionButton.setText("Iniciar monitor continuo experimental");sessionButton.setVisibility(View.GONE);root.addView(sessionButton);sessionButton.setOnClickListener(v->startSession());
    status=new TextView(this);status.setText("Sin realizar consultas.");status.setTextIsSelectable(true);status.setPadding(0,24,0,10);root.addView(status);
    Button close=new Button(this);close.setText("Cerrar diagnóstico");root.addView(close);close.setOnClickListener(v->finish());
  }
@@ -204,7 +204,7 @@ public class ConnectionTestActivity extends Activity {
      startForegroundService(intent);
      mqttConfig=null;mqttSecret=null;token=null;encryptedEmail=null;
      listenButton.setEnabled(false);sessionButton.setEnabled(false);
-     say("Monitor MQTT iniciado. Aparecerá una notificación persistente. Puedes apagar la pantalla; la sesión está limitada a 90 minutos. Si la notificación desaparece, el servicio puede haber terminado.");
+     say("Monitor MQTT iniciado sin Home Assistant. Deja activa la notificación persistente. Android puede detener el monitor por batería o cerrar el servicio; tras reiniciar el teléfono hay que volver a iniciar sesión.");
    }catch(RuntimeException err){say("No se pudo iniciar el servicio: "+safeError(err));}
  }
  private void listen(){

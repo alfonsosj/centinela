@@ -67,7 +67,7 @@ public class MainActivity extends Activity {
    box.setOrientation(1);box.setPadding(24,32,24,36);sc.addView(box);setContentView(sc);
    TextView h=new TextView(this);h.setText("MAZDA AVISOS LAB");
    h.setTextSize(24);h.setTextColor(Color.rgb(22,48,75));box.addView(h);
-   line("Versión 0.8 experimental: mejora la recuperación ante cambios de red y muestra el estado reciente de escucha. Sesiones de 90 minutos, no vigilancia 24/7 ni alarma de seguridad.");
+   line("Versión 0.9 experimental: monitor directo de Mazda por MQTT sin Home Assistant ni servidor externo. Escucha continua mientras Android permita mantener el servicio de primer plano; no garantiza 24/7.");
    line((enabled()?"✓":"○")+" Accesibilidad: "+(enabled()?"activada":"desactivada"));
    button("1. Activar accesibilidad",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
    if(Build.VERSION.SDK_INT>=33){

@@ -4,11 +4,14 @@
  <uses-permission android:name="android.permission.INTERNET"/>
  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
- <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+ <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
  <queries><package android:name="com.cma.mazda.eu"/></queries>
  <application android:label="Mazda Avisos Lab" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
   <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
-  <service android:name=".MqttSessionService" android:exported="false" android:foregroundServiceType="dataSync" android:stopWithTask="false"/>
+  <service android:name=".MqttSessionService" android:exported="false" android:foregroundServiceType="specialUse" android:stopWithTask="false">
+   <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+    android:value="Continuous user-initiated read-only MQTT subscription for immediate vehicle status change notifications. Cannot use periodic scheduled jobs for real-time alerts."/>
+  </service>
   <activity android:name=".ConnectionTestActivity" android:exported="false"/>
   <activity android:name=".CheckActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
   <service android:name=".MazdaQuickTile" android:label="Comprobar Mazda" android:icon="@android:drawable/ic_dialog_info"

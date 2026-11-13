@@ -14,7 +14,8 @@ import org.json.JSONObject;
 /**
  * Sesión de escucha temporal, iniciada por el usuario.
  * No almacena credenciales ni contenidos MQTT; conserva solo diagnósticos.
- * Android puede finalizar un dataSync FGS antes de agotar los 90 minutos.
+ * Uso especial: recepción continua de eventos de estado del vehículo en tiempo real.
+ * Android puede finalizar el servicio por restricciones de batería, aunque no tenga temporizador propio.
  */
 public final class MqttSessionService extends Service {
  public static final String ACTION_START="es.retalis.mazdaavisos.START_MQTT";
@@ -22,7 +23,8 @@ public final class MqttSessionService extends Service {
  public static final String EXTRA_CONFIG="mqtt_configuration";
  public static final String EXTRA_AUTH="mqtt_credential";
  private static final String NOTIFY_CHANNEL="mazda_mqtt_monitor";
- private static final int NOTIFY_ID=7901, DURATION_SECONDS=90*60;
+ private static final int NOTIFY_ID=7901;
+ private static final int MQTT_RECONNECT_CYCLE_SECONDS=4*60*60;
  private static final String PREF="mqtt_status";
  private final AtomicBoolean running=new AtomicBoolean(false);
  private final ExecutorService worker=Executors.newSingleThreadExecutor();
@@ -34,6 +36,7 @@ public final class MqttSessionService extends Service {
  private ConnectivityManager.NetworkCallback networkCallback;
  private long lastNotify=0;
  private int reconnects=0;
+ private Integer lastDoorLock=null;
 
  public static String currentStatus(Context context){
    android.content.SharedPreferences p=context.getSharedPreferences(PREF,MODE_PRIVATE);
@@ -141,7 +144,7 @@ public final class MqttSessionService extends Service {
    String config=intent.getStringExtra(EXTRA_CONFIG);
    String auth=intent.getStringExtra(EXTRA_AUTH);
    if(config==null||auth==null||auth.isEmpty()){shutdown("Falta autorización MQTT.");return START_NOT_STICKY;}
-   try{startForeground(NOTIFY_ID,notification("Iniciando escucha de prueba · máximo 90 min"));}
+   try{startForeground(NOTIFY_ID,notification("Conectando con Mazda · monitor continuo experimental"));}
    catch(RuntimeException e){shutdown("Android rechazó iniciar el monitor.");return START_NOT_STICKY;}
    quit=false;
    state("Iniciando escucha MQTT",true);
@@ -161,9 +164,11 @@ public final class MqttSessionService extends Service {
    String finishReason="Sesión finalizada.";
    try {
      JSONObject cfg=new JSONObject(config);
-     long end=SystemClock.elapsedRealtime()+DURATION_SECONDS*1000L;
+     // Sin límite propio de 90 minutos. El servicio continúa mientras Android lo autorice.
+     // Cada 4 h se recrea la sesión MQTT con autorización aún válida; si expira el token
+     // se informa de la interrupción, sin guardar contraseñas ni tokens en disco.
      int failures=0;
-     while(!quit&&SystemClock.elapsedRealtime()<end){
+     while(!quit){
        if(!online()){
          state("Sin conexión de red. Esperando Wi-Fi o datos móviles...",true);
          delay(10000);
@@ -173,9 +178,9 @@ public final class MqttSessionService extends Service {
        try{
          MqttProbe p=new MqttProbe(this,cfg,auth);
          probe=p;
-         int remaining=(int)Math.max(1,(end-SystemClock.elapsedRealtime())/1000L);
+         p.setInitialDoorLock(lastDoorLock);
          state("Conectando por "+networkLabel()+"...",true);
-         p.run(message->state(networkLabel()+" · "+message,true),remaining);
+         p.run(message->state(networkLabel()+" · "+message,true),MQTT_RECONNECT_CYCLE_SECONDS);
          failures=0;
        }catch(Exception e){
          if(quit)break;
@@ -192,14 +197,14 @@ public final class MqttSessionService extends Service {
          }
        }finally{
          MqttProbe p=probe;probe=null;
-         if(p!=null)p.close();
+         if(p!=null){lastDoorLock=p.getLastDoorLock();p.close();}
        }
-       if(quit||SystemClock.elapsedRealtime()>=end)break;
+       if(quit)break;
        if(networkChanged){networkChanged=false;continue;}
        long pause=Math.min(90000L,3000L*(1L<<Math.min(5,Math.max(0,failures-1))));
        delay(pause);
      }
-     if(!quit)finishReason="Sesión de 90 minutos completada.";
+     if(!quit)finishReason="Monitor finalizado.";
    }catch(Exception e){finishReason="No se pudo continuar la escucha MQTT.";}
    finally{
      quit=true;
