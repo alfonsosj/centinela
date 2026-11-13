@@ -67,7 +67,7 @@ public class MainActivity extends Activity {
    box.setOrientation(1);box.setPadding(24,32,24,36);sc.addView(box);setContentView(sc);
    TextView h=new TextView(this);h.setText("MAZDA AVISOS LAB");
    h.setTextSize(24);h.setTextColor(Color.rgb(22,48,75));box.addView(h);
-   line("Versión 0.6 experimental: permite escuchar MQTT durante dos minutos con una cuenta de pruebas, identificar cambios de cierre y probar avisos Android. No es vigilancia en segundo plano.");
+   line("Versión 0.7 experimental: permite escucha MQTT durante 90 minutos con la pantalla apagada y reconexión mientras esté activa. No es vigilancia permanente ni sustituye una alarma del coche.");
    line((enabled()?"✓":"○")+" Accesibilidad: "+(enabled()?"activada":"desactivada"));
    button("1. Activar accesibilidad",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
    if(Build.VERSION.SDK_INT>=33){
@@ -79,7 +79,9 @@ public class MainActivity extends Activity {
      });
    }
    line("Nuevo: en el panel de ajustes rápidos de Samsung, pulsa Editar botones y añade «Comprobar Mazda». Funciona cuando tú pulsas el botón, con el móvil desbloqueado.");
-   button("Probar acceso MQTT (cuenta secundaria)",()->startActivity(new Intent(this,ConnectionTestActivity.class)));
+   line("Monitor MQTT de prueba: "+MqttSessionService.currentStatus(this));
+   button("Configurar / iniciar MQTT con cuenta secundaria",()->startActivity(new Intent(this,ConnectionTestActivity.class)));
+   button("Detener monitor MQTT",()->{startService(new Intent(this,MqttSessionService.class).setAction(MqttSessionService.ACTION_STOP));line("Detención solicitada.");});
    button("Comprobar mensajes de Mazda ahora (PRUEBA)",()->launchMazda(true));
    line("Abre Mazda e intenta pulsar solo el botón de mensajes si Android identifica su ID. Si no lo encuentra, toca el botón de mensajes manualmente; la app guardará un diagnóstico.");
    button("Abrir Mazda sin automatización",()->launchMazda(false));
@@ -97,7 +99,7 @@ public class MainActivity extends Activity {
      .setMessage("Se borrarán los mensajes. La siguiente lectura será importación sin avisos.")
      .setPositiveButton("Borrar",(a,b)->{Data.clear(this);show();})
      .setNegativeButton("Cancelar",null).show());
-   line("Privacidad: la prueba MQTT utiliza Internet exclusivamente para iniciar sesión y consultar la configuración de Mazda con una cuenta secundaria. Las credenciales no se guardan. Los mensajes se almacenan localmente. La navegación automática se activa únicamente al pulsar el botón de prueba y caduca en 30 segundos. No sustituye las alertas de seguridad del vehículo.");
+   line("Privacidad: MQTT se conecta a servicios Mazda Europa con cuenta secundaria. Credenciales y tokens solo permanecen en memoria durante la sesión; no se guardan. Los mensajes se almacenan localmente. La navegación automática se activa únicamente al pulsar el botón de prueba y caduca en 30 segundos. No sustituye las alertas de seguridad del vehículo.");
  }
  @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){
    super.onRequestPermissionsResult(request,permissions,results);show();

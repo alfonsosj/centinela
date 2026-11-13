@@ -42,7 +42,7 @@ public class ConnectionTestActivity extends Activity {
  private final ExecutorService executor=Executors.newSingleThreadExecutor();
  private EditText emailField,passwordField,codeField;
  private TextView status;
- private Button loginButton,verifyButton,listenButton;
+ private Button loginButton,verifyButton,listenButton,sessionButton;
  private MqttProbe probe;
  private JSONObject mqttConfig;
  private String mqttSecret;
@@ -59,7 +59,7 @@ public class ConnectionTestActivity extends Activity {
    LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(28,36,28,32);scroll.addView(root);setContentView(scroll);
    TextView title=new TextView(this);title.setText("PRUEBA MQTT · MAZDA EUROPA");title.setTextSize(21);root.addView(title);
    TextView info=new TextView(this);
-   info.setText("Solo cuenta compartida de pruebas. Las credenciales viajan cifradas por HTTPS a Mazda Europa y no se guardan en el dispositivo ni en GitHub. NO introduzcas tu cuenta principal. Esta versión comprueba autorización MQTT y permite escuchar durante dos minutos, sin control del vehículo.");
+   info.setText("Solo cuenta compartida de pruebas. Las credenciales viajan cifradas por HTTPS a Mazda Europa y no se guardan en el dispositivo ni en GitHub. NO introduzcas tu cuenta principal. Esta versión permite la escucha MQTT de dos minutos o una sesión de 90 minutos con una notificación de primer plano. No es una alarma de seguridad.");
    info.setPadding(0,18,0,18);root.addView(info);
    emailField=new EditText(this);emailField.setSingleLine(true);emailField.setHint("Correo cuenta secundaria");emailField.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);root.addView(emailField);
    passwordField=new EditText(this);passwordField.setSingleLine(true);passwordField.setHint("Contraseña de cuenta secundaria");passwordField.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);root.addView(passwordField);
@@ -67,11 +67,12 @@ public class ConnectionTestActivity extends Activity {
    codeField=new EditText(this);codeField.setHint("Código recibido por email");codeField.setInputType(InputType.TYPE_CLASS_NUMBER);codeField.setVisibility(View.GONE);root.addView(codeField);
    verifyButton=new Button(this);verifyButton.setText("2. Verificar dispositivo y consultar MQTT");verifyButton.setVisibility(View.GONE);root.addView(verifyButton);verifyButton.setOnClickListener(v->verify());
    listenButton=new Button(this);listenButton.setText("Escuchar MQTT durante 2 minutos");listenButton.setVisibility(View.GONE);root.addView(listenButton);listenButton.setOnClickListener(v->listen());
+   sessionButton=new Button(this);sessionButton.setText("Iniciar monitor en segundo plano (90 minutos)");sessionButton.setVisibility(View.GONE);root.addView(sessionButton);sessionButton.setOnClickListener(v->startSession());
    status=new TextView(this);status.setText("Sin realizar consultas.");status.setTextIsSelectable(true);status.setPadding(0,24,0,10);root.addView(status);
    Button close=new Button(this);close.setText("Cerrar diagnóstico");root.addView(close);close.setOnClickListener(v->finish());
  }
  private void say(String text){previousMessage=text;runOnUiThread(()->status.setText(text));}
- private void busy(boolean on){runOnUiThread(()->{loginButton.setEnabled(!on);verifyButton.setEnabled(!on);listenButton.setEnabled(!on);});}
+ private void busy(boolean on){runOnUiThread(()->{loginButton.setEnabled(!on);verifyButton.setEnabled(!on);listenButton.setEnabled(!on);sessionButton.setEnabled(!on);});}
  private void verificationUI(){runOnUiThread(()->{codeField.setVisibility(View.VISIBLE);verifyButton.setVisibility(View.VISIBLE);});}
  private void hideVerification(){runOnUiThread(()->{codeField.setVisibility(View.GONE);verifyButton.setVisibility(View.GONE);});}
  private void startLogin(){
@@ -180,7 +181,7 @@ public class ConnectionTestActivity extends Activity {
          }
        }
      }
-     if(authReady && cfg!=null && reports>0){mqttConfig=cfg;mqttSecret=auth.optString("authToken");runOnUiThread(()->listenButton.setVisibility(View.VISIBLE));}
+     if(authReady && cfg!=null && reports>0){mqttConfig=cfg;mqttSecret=auth.optString("authToken");runOnUiThread(()->{listenButton.setVisibility(View.VISIBLE);sessionButton.setVisibility(View.VISIBLE);});}
      say("PRUEBA TERMINADA\n\nVehículos visibles: "+vehicles.length()+
        "\nConfiguración THU: disponible"+
        "\nAutorización MQTT: "+(authReady?"concedida":"no confirmada")+
@@ -189,6 +190,21 @@ public class ConnectionTestActivity extends Activity {
        "\n\nSi la autorización fue concedida, pulsa «Escuchar MQTT» para una prueba de 2 minutos.");
      token=null;
    }catch(Exception ex){token=null;say("Sesión iniciada, pero falló el diagnóstico MQTT: "+safeError(ex));}
+ }
+ private void startSession(){
+   if(mqttConfig==null||mqttSecret==null||mqttSecret.isEmpty()){say("Primero autoriza la cuenta secundaria.");return;}
+   if(android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
+     say("Primero concede permiso de notificaciones en la pantalla principal de Mazda Avisos Lab.");return;
+   }
+   Intent intent=new Intent(this,MqttSessionService.class).setAction(MqttSessionService.ACTION_START);
+   intent.putExtra(MqttSessionService.EXTRA_CONFIG,mqttConfig.toString());
+   intent.putExtra(MqttSessionService.EXTRA_AUTH,mqttSecret);
+   try{
+     startForegroundService(intent);
+     mqttConfig=null;mqttSecret=null;token=null;encryptedEmail=null;
+     listenButton.setEnabled(false);sessionButton.setEnabled(false);
+     say("Monitor MQTT iniciado. Aparecerá una notificación persistente. Puedes apagar la pantalla; la sesión está limitada a 90 minutos. Si la notificación desaparece, el servicio puede haber terminado.");
+   }catch(RuntimeException err){say("No se pudo iniciar el servicio: "+safeError(err));}
  }
  private void listen(){
    if(mqttConfig==null||mqttSecret==null){say("Primero comprueba la autorización MQTT.");return;}
@@ -199,7 +215,7 @@ public class ConnectionTestActivity extends Activity {
      try{probe=new MqttProbe(this,cfg,pw);probe.run(this::say,120);}
      catch(Exception e){say("Error en la escucha MQTT: "+safeError(e));}
      finally{if(probe!=null)probe.close();probe=null;mqttConfig=null;mqttSecret=null;token=null;encryptedEmail=null;
-       runOnUiThread(()->{listenButton.setVisibility(View.GONE);getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);});busy(false);}
+       runOnUiThread(()->{listenButton.setVisibility(View.GONE);sessionButton.setVisibility(View.GONE);getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);});busy(false);}
    });
  }
  private String findThu(Object node,int depth){
