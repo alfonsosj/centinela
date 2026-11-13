@@ -67,7 +67,7 @@ public class MainActivity extends Activity {
    box.setOrientation(1);box.setPadding(24,32,24,36);sc.addView(box);setContentView(sc);
    TextView h=new TextView(this);h.setText("MAZDA AVISOS LAB");
    h.setTextSize(24);h.setTextColor(Color.rgb(22,48,75));box.addView(h);
-   line("Versión 0.5 experimental: añade diagnóstico de autorización MQTT con una cuenta de pruebas. Todavía no conecta con el broker ni recibe avisos push por sí misma.");
+   line("Versión 0.6 experimental: permite escuchar MQTT durante dos minutos con una cuenta de pruebas, identificar cambios de cierre y probar avisos Android. No es vigilancia en segundo plano.");
    line((enabled()?"✓":"○")+" Accesibilidad: "+(enabled()?"activada":"desactivada"));
    button("1. Activar accesibilidad",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
    if(Build.VERSION.SDK_INT>=33){

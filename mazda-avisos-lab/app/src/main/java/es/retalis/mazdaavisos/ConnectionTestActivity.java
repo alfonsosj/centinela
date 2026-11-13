@@ -42,7 +42,10 @@ public class ConnectionTestActivity extends Activity {
  private final ExecutorService executor=Executors.newSingleThreadExecutor();
  private EditText emailField,passwordField,codeField;
  private TextView status;
- private Button loginButton,verifyButton;
+ private Button loginButton,verifyButton,listenButton;
+ private MqttProbe probe;
+ private JSONObject mqttConfig;
+ private String mqttSecret;
  private String token=null,encryptedEmail=null,deviceId=null;
  private String previousMessage="";
  @Override public void onCreate(Bundle state){
@@ -56,18 +59,19 @@ public class ConnectionTestActivity extends Activity {
    LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(28,36,28,32);scroll.addView(root);setContentView(scroll);
    TextView title=new TextView(this);title.setText("PRUEBA MQTT · MAZDA EUROPA");title.setTextSize(21);root.addView(title);
    TextView info=new TextView(this);
-   info.setText("Solo cuenta compartida de pruebas. Las credenciales viajan cifradas por HTTPS a Mazda Europa y no se guardan en el dispositivo ni en GitHub. NO introduzcas tu cuenta principal. Esta versión no abre una conexión MQTT ni recibe eventos: solo comprueba si Mazda ofrece los canales y el token necesarios.");
+   info.setText("Solo cuenta compartida de pruebas. Las credenciales viajan cifradas por HTTPS a Mazda Europa y no se guardan en el dispositivo ni en GitHub. NO introduzcas tu cuenta principal. Esta versión comprueba autorización MQTT y permite escuchar durante dos minutos, sin control del vehículo.");
    info.setPadding(0,18,0,18);root.addView(info);
    emailField=new EditText(this);emailField.setSingleLine(true);emailField.setHint("Correo cuenta secundaria");emailField.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);root.addView(emailField);
    passwordField=new EditText(this);passwordField.setSingleLine(true);passwordField.setHint("Contraseña de cuenta secundaria");passwordField.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);root.addView(passwordField);
    loginButton=new Button(this);loginButton.setText("1. Comprobar autorización en Mazda");root.addView(loginButton);loginButton.setOnClickListener(v->startLogin());
    codeField=new EditText(this);codeField.setHint("Código recibido por email");codeField.setInputType(InputType.TYPE_CLASS_NUMBER);codeField.setVisibility(View.GONE);root.addView(codeField);
    verifyButton=new Button(this);verifyButton.setText("2. Verificar dispositivo y consultar MQTT");verifyButton.setVisibility(View.GONE);root.addView(verifyButton);verifyButton.setOnClickListener(v->verify());
+   listenButton=new Button(this);listenButton.setText("Escuchar MQTT durante 2 minutos");listenButton.setVisibility(View.GONE);root.addView(listenButton);listenButton.setOnClickListener(v->listen());
    status=new TextView(this);status.setText("Sin realizar consultas.");status.setTextIsSelectable(true);status.setPadding(0,24,0,10);root.addView(status);
    Button close=new Button(this);close.setText("Cerrar diagnóstico");root.addView(close);close.setOnClickListener(v->finish());
  }
  private void say(String text){previousMessage=text;runOnUiThread(()->status.setText(text));}
- private void busy(boolean on){runOnUiThread(()->{loginButton.setEnabled(!on);verifyButton.setEnabled(!on);});}
+ private void busy(boolean on){runOnUiThread(()->{loginButton.setEnabled(!on);verifyButton.setEnabled(!on);listenButton.setEnabled(!on);});}
  private void verificationUI(){runOnUiThread(()->{codeField.setVisibility(View.VISIBLE);verifyButton.setVisibility(View.VISIBLE);});}
  private void hideVerification(){runOnUiThread(()->{codeField.setVisibility(View.GONE);verifyButton.setVisibility(View.GONE);});}
  private void startLogin(){
@@ -176,14 +180,27 @@ public class ConnectionTestActivity extends Activity {
          }
        }
      }
+     if(authReady && cfg!=null && reports>0){mqttConfig=cfg;mqttSecret=auth.optString("authToken");runOnUiThread(()->listenButton.setVisibility(View.VISIBLE));}
      say("PRUEBA TERMINADA\n\nVehículos visibles: "+vehicles.length()+
        "\nConfiguración THU: disponible"+
        "\nAutorización MQTT: "+(authReady?"concedida":"no confirmada")+
        "\nCanales properties/report: "+reports+
        "\nCanales events/up: "+events+
-       "\n\nTodavía NO hemos conectado al broker ni recibido eventos. Esta comprobación solo determina si Mazda entrega los canales y credenciales a la cuenta compartida.");
+       "\n\nSi la autorización fue concedida, pulsa «Escuchar MQTT» para una prueba de 2 minutos.");
      token=null;
    }catch(Exception ex){token=null;say("Sesión iniciada, pero falló el diagnóstico MQTT: "+safeError(ex));}
+ }
+ private void listen(){
+   if(mqttConfig==null||mqttSecret==null){say("Primero comprueba la autorización MQTT.");return;}
+   final JSONObject cfg=mqttConfig;final String pw=mqttSecret;
+   busy(true);say("Iniciando escucha de prueba...");
+   getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+   executor.execute(()->{
+     try{probe=new MqttProbe(this,cfg,pw);probe.run(this::say,120);}
+     catch(Exception e){say("Error en la escucha MQTT: "+safeError(e));}
+     finally{if(probe!=null)probe.close();probe=null;mqttConfig=null;mqttSecret=null;token=null;encryptedEmail=null;
+       runOnUiThread(()->{listenButton.setVisibility(View.GONE);getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);});busy(false);}
+   });
  }
  private String findThu(Object node,int depth){
    if(node==null||depth>30)return null;
@@ -258,5 +275,5 @@ public class ConnectionTestActivity extends Activity {
    if(m.length()>160)m=m.substring(0,160);
    return m.replaceAll("(?i)bearer\\s+[A-Za-z0-9._\\-]+","[oculto]");
  }
- @Override protected void onDestroy(){token=null;encryptedEmail=null;executor.shutdownNow();super.onDestroy();}
+ @Override protected void onDestroy(){if(probe!=null)probe.close();mqttConfig=null;mqttSecret=null;token=null;encryptedEmail=null;executor.shutdownNow();super.onDestroy();}
 }
