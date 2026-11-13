@@ -28,6 +28,8 @@ final class AlertRules {
  private int lockChanges=0,totalAlerts=0;
  private Integer currentCharge=null;
  private boolean parkKnown=false,parked=false;
+ private boolean lockKnown=false,locked=false;
+ private long lastBundleAt=0;
  private static final String[] DOOR_KEYS={"driverDoor","passengerDoor","leftRearDoor","rightRearDoor"};
  private static final String[] WINDOW_KEYS={"diverWindow","passengerWindow","leftRearWindow","rightRearWindow"};
  private static final String[] POSITIONS={"conductor","acompañante","trasera izquierda","trasera derecha"};
@@ -49,6 +51,7 @@ final class AlertRules {
    if(id>Integer.MAX_VALUE-100)ID.set(6100);
    MainActivity.alert(app,title,text,id);
    totalAlerts++;
+   AlertHistory.add(app,title,text);
  }
  private Integer code(JSONObject values,String key,int min,int max){
    Object value=values.opt(key);
@@ -76,7 +79,7 @@ final class AlertRules {
    int now=code==0?0:1;
    Integer before=update(key,now);
    if(before==null||before==now)return;
-   boolean armed=enabled(app,SENTINEL);
+   boolean armed=sentinelArmed();
    String action=now==1?"abierta":"cerrada";
    if(now==1&&armed){
      notifyUser("Centinela: "+label+" abierta",
@@ -90,9 +93,10 @@ final class AlertRules {
    Integer lock=code(raw,"driverDoorLock",0,1);
    if(lock!=null){
      Integer prior=update("driverDoorLock",lock);
+     lockKnown=true;locked=lock==0;
      if(prior!=null&&prior.intValue()!=lock.intValue()){
        lockChanges++;
-       if(lock==1&&enabled(app,SENTINEL)){
+       if(lock==1&&enabled(app,SENTINEL)&&prior==0){
          notifyUser("Centinela: vehículo desbloqueado",
            "Se ha detectado desbloqueo. Puede ser una acción autorizada.");
        }else if(enabled(app,LOCKS)){
@@ -210,6 +214,7 @@ final class AlertRules {
        "El sensor del coche está a "+lower+" °C o menos.");
    }
  }
+ private boolean sentinelArmed(){return enabled(app,SENTINEL)&&lockKnown&&locked&&parkKnown&&parked;}
  int getLockChanges(){return lockChanges;}
  Integer getLastDoorLock(){return states.get("driverDoorLock");}
  void setInitialDoorLock(Integer old){if(old!=null&&(old==0||old==1))states.put("driverDoorLock",old);}
@@ -217,6 +222,6 @@ final class AlertRules {
    return "Avisos generados: "+totalAlerts+
     "\nBatería: "+(lastSoc==null?"sin dato":pct(lastSoc))+
     "\nTemperatura interior: "+(lastTemp==null?"sin dato":Math.round(lastTemp)+" °C")+
-    "\nCentinela básico: "+(enabled(app,SENTINEL)?"armado":"desarmado");
+    "\nCentinela básico: "+(sentinelArmed()?"armado (aparcado y cerrado)":enabled(app,SENTINEL)?"en espera de aparcado y cierre":"desactivado");
  }
 }

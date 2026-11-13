@@ -25,7 +25,7 @@ public final class AlertSettingsActivity extends Activity {
    toggle("Apertura/cierre de ventanas",AlertRules.WINDOWS);
    toggle("Apertura/cierre de maletero",AlertRules.TRUNK);
    toggle("Centinela básico (avisos destacados de aperturas)",AlertRules.SENTINEL);
-   explain("Centinela básico: avisa al detectar desbloqueo, apertura de puertas, ventanas o maletero. Puede ser una acción tuya; no detecta golpes, cámaras, personas ni intrusiones reales. No sustituye una alarma.");
+   explain("Centinela básico: destaca aperturas solo cuando el coche comunica aparcado y bloqueado. Un desbloqueo se avisa al cambiar de bloqueado a desbloqueado. No detecta golpes, personas ni intrusiones y no sustituye una alarma.");
    section("Batería y carga");
    toggle("Carga iniciada, detenida o en espera",AlertRules.CHARGE);
    toggle("Cable de carga conectado o desconectado",AlertRules.CABLE);
