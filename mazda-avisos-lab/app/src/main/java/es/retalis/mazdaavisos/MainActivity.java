@@ -67,7 +67,7 @@ public class MainActivity extends Activity {
    box.setOrientation(1);box.setPadding(24,32,24,36);sc.addView(box);setContentView(sc);
    TextView h=new TextView(this);h.setText("MAZDA AVISOS LAB");
    h.setTextSize(24);h.setTextColor(Color.rgb(22,48,75));box.addView(h);
-   line("Versión 0.3 experimental: prueba de acceso al Centro de Mensajes con un toque. No consulta servicios de Mazda con el móvil bloqueado ni lee mensajes sin abrir la app oficial.");
+   line("Versión 0.4 experimental: acceso rápido para comprobar mensajes desde los ajustes rápidos de Android. No consulta el servidor de Mazda con el móvil bloqueado ni recibe avisos push por sí misma.");
    line((enabled()?"✓":"○")+" Accesibilidad: "+(enabled()?"activada":"desactivada"));
    button("1. Activar accesibilidad",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
    if(Build.VERSION.SDK_INT>=33){
@@ -78,6 +78,7 @@ public class MainActivity extends Activity {
        else startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));
      });
    }
+   line("Nuevo: en el panel de ajustes rápidos de Samsung, pulsa Editar botones y añade «Comprobar Mazda». Funciona cuando tú pulsas el botón, con el móvil desbloqueado.");
    button("Comprobar mensajes de Mazda ahora (PRUEBA)",()->launchMazda(true));
    line("Abre Mazda e intenta pulsar solo el botón de mensajes si Android identifica su ID. Si no lo encuentra, toca el botón de mensajes manualmente; la app guardará un diagnóstico.");
    button("Abrir Mazda sin automatización",()->launchMazda(false));

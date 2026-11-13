@@ -1,13 +1,18 @@
-# Mazda Avisos Lab 0.3 — experimental
+# Mazda Avisos Lab 0.4 — experimental
 
-App auxiliar para Mazda CX-6e/6e europea, sin permiso INTERNET y sin control del coche.
-- Lee texto visible del Centro de Mensajes de la app Mazda con accesibilidad.
-- Al pulsar **Comprobar mensajes de Mazda ahora (PRUEBA)** abre la app Mazda y durante 30 segundos intenta pulsar **solo** el control con view ID `iv_home_msg`. No utiliza coordenadas ni clics genéricos.
-- Si no encuentra el botón almacena diagnóstico técnico de IDs y tipos de controles, sin valores de campos o contenido del perfil, para ajustar la próxima versión.
-- Con el Centro abierto, importa los mensajes; la primera lectura no produce alertas históricas.
-- No consulta el servidor ni puede generar avisos cuando Mazda no está abierta.
-- Por seguridad no usa contraseñas, tokens, automatización de controles del vehículo ni acceso a red.
+App auxiliar de lectura del Centro de Mensajes. No tiene permiso INTERNET, no controla el vehículo y no modifica la aplicación Mazda original.
 
-**NOTA DE INSTALACIÓN:** la v0.2 fue firmada con la clave debug temporal de otra ejecución de GitHub Actions. Para instalar la v0.3 tendrás que desinstalar v0.2 (se borrará su historial local) y volver a habilitar accesibilidad/notificaciones; la app Mazda oficial no se desinstala. Para futuras actualizaciones sin reinstalar será necesaria una firma estable y protegida.
+## Nuevo en v0.4
+- Nuevo mosaico en los **Ajustes rápidos** de Samsung, llamado **Comprobar Mazda**.
+- Cuando la persona lo pulsa, Android abre Mazda; el servicio de accesibilidad intenta pulsar el icono exacto `iv_home_msg` para mostrar el Centro de Mensajes, y registra mensajes nuevos.
+- La solicitud de automatización caduca tras 30 segundos.
+- Para usarlo: deslizar dos veces desde arriba, editar botones, añadir "Comprobar Mazda", guardar y pulsarlo con el móvil desbloqueado.
+- Conserva la lectura de avisos y las notificaciones de v0.3.
 
-Instala el artefacto APK de GitHub Actions tras extraerlo. Es una prueba, no un sistema fiable de alarmas.
+## Límites
+No comprueba avisos autónomamente con el móvil bloqueado ni funciona como sustituto de un sistema push real. Android limita la apertura de pantallas desde segundo plano y el complemento no tiene acceso a la API de Mazda.
+
+## Instalación
+Cada compilación desde GitHub Actions usa una firma debug temporal. Para sustituir v0.3, desinstala **solamente Mazda Avisos Lab** (pierde el historial local) e instala v0.4; permite accesibilidad y notificaciones de nuevo. **No desinstales ni desvincules Mazda oficial**.
+
+Sin permiso de Internet; diagnósticos técnicos locales de estructura de botones. La información de mensajes se guarda en el móvil y se elimina al desinstalar.

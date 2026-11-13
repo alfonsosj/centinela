@@ -4,6 +4,11 @@
  <queries><package android:name="com.cma.mazda.eu"/></queries>
  <application android:label="Mazda Avisos Lab" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
   <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+  <activity android:name=".CheckActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
+  <service android:name=".MazdaQuickTile" android:label="Comprobar Mazda" android:icon="@android:drawable/ic_dialog_info"
+    android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true">
+    <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
+  </service>
   <service android:name=".MazdaMonitor" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:label="Detectar mensajes de Mazda">
    <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>
    <meta-data android:name="android.accessibilityservice" android:resource="@xml/monitor"/>
