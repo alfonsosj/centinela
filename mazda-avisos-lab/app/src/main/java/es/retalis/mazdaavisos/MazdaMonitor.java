@@ -48,7 +48,7 @@ public class MazdaMonitor extends AccessibilityService {
         Data.status(this,"El acceso automático no encontró el Centro de Mensajes. Abre Mazda manualmente.");
         stopCheck();
      } else {
-        Data.diagnostic(this,snapshot(root));
+        Data.technicalDiagnostic(this,snapshot(root));
         if(!clickAttempted) {
           AccessibilityNodeInfo button=findMessageButton(root,0);
           if(button!=null){

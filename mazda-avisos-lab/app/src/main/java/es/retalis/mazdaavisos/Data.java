@@ -25,6 +25,8 @@ final class Data {
  static void status(Context c,String s){p(c).edit().putString("last",s).apply();}
  static String last(Context c){return p(c).getString("last","Sin lecturas");}
  static void diagnostic(Context c,String s){p(c).edit().putString("diagnostic",s).apply();}
+ static void technicalDiagnostic(Context c,String s){p(c).edit().putString("nav_diagnostic",s).apply();}
+ static String technicalDiagnostic(Context c){return p(c).getString("nav_diagnostic","Sin diagnóstico: pulsa Comprobar mensajes de Mazda ahora.");}
  static String diagnostic(Context c){return p(c).getString("diagnostic","Sin lectura de pantalla");}
  static List<String> history(Context c){
   List<String> list=new ArrayList<>();

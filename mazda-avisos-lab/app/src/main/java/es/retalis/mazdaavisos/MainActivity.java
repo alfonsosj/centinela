@@ -89,7 +89,7 @@ public class MainActivity extends Activity {
    button("Actualizar historial",this::show);
    button("Copiar diagnóstico técnico",()->{
      ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-     if(cb!=null)cb.setPrimaryClip(ClipData.newPlainText("Diagnóstico Mazda",Data.diagnostic(this)));
+     if(cb!=null)cb.setPrimaryClip(ClipData.newPlainText("Diagnóstico Mazda",Data.technicalDiagnostic(this)));
    });
    button("Borrar historial local",()->new android.app.AlertDialog.Builder(this).setTitle("Borrar historial")
      .setMessage("Se borrarán los mensajes. La siguiente lectura será importación sin avisos.")
