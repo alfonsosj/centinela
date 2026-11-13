@@ -1,8 +1,10 @@
-# Mazda Avisos Lab v0.11 — interfaz renovada y Centinela contextual
+# Mazda Avisos Lab v0.12 — tablero visual
 
-- Pantalla principal rediseñada con fondo claro, tarjetas blancas redondeadas, tipografía jerárquica y botones discretos inspirados en la app Mazda oficial, sin copiar sus recursos gráficos ni su marca.
-- Historial local de los últimos 100 avisos con fecha y hora, disponible desde la pantalla principal.
-- Centinela básico: las aperturas de puertas, ventanas y maletero solo se destacan cuando el último estado recibido del coche es **aparcado y bloqueado**. El desbloqueo se avisa como cambio, aunque puede ser legítimo.
-- Monitor MQTT autónomo, sin Home Assistant. Mantiene el servicio de primer plano experimental y las preferencias de v0.10.
-- Primer estado MQTT es referencia; no es una alarma ni verifica intrusiones.
-- Requiere validar en vehículo la correspondencia de todos los campos y los códigos de carga. No se ha identificado el origen de los avisos de ocupantes.
+- Portada con ilustración vectorial original de un crossover y diseño de tarjetas inspirado en la organización de Mazda Europa (sin copiar sus imágenes o su identidad).
+- Batería y temperatura interior como indicadores principales; además autonomía, carga, bloqueo y ventanas cuando estén disponibles.
+- Los números solo aparecen cuando se han recibido realmente: conexión MQTT no implica telemetría disponible. Se muestra la antigüedad de la última lectura y una advertencia si supera 20 minutos.
+- Datos mínimos guardados en el dispositivo únicamente para visualizar las últimas lecturas (SOC, temperatura, autonomía, estados básicos), sin guardar VIN, credenciales ni mensajes MQTT completos.
+- Agrupa en una sola notificación las ventanas que cambien juntas dentro del mismo informe, evitando cuatro avisos simultáneos.
+- Herramientas técnicas plegadas, botón de configuración visible, historial local de notificaciones.
+- Monitoreo MQTT directo en Android sin Home Assistant y funciones previas intactas.
+- No es alarma de seguridad; la recepción de mensajes de ocupantes del Centro de Mensajes sigue sin demostrar.

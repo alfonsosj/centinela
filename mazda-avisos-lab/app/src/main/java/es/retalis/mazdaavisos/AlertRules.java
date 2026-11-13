@@ -90,6 +90,7 @@ final class AlertRules {
  }
  void ingest(JSONObject raw){
    if(raw==null)return;
+   VehicleSnapshot.observe(app,raw);
    Integer lock=code(raw,"driverDoorLock",0,1);
    if(lock!=null){
      Integer prior=update("driverDoorLock",lock);
@@ -107,10 +108,34 @@ final class AlertRules {
    }
    for(int i=0;i<DOOR_KEYS.length;i++)binary(raw,DOOR_KEYS[i],"Puerta "+POSITIONS[i],DOORS,false);
    binary(raw,"trunk","Maletero",TRUNK,true);
-   for(int i=0;i<WINDOW_KEYS.length;i++)binary(raw,WINDOW_KEYS[i],"Ventana "+POSITIONS[i],WINDOWS,false);
+   windows(raw);
    charge(raw);
    battery(raw);
    temperature(raw);
+ }
+ private void windows(JSONObject raw){
+   java.util.List<String> opened=new java.util.ArrayList<>();
+   java.util.List<String> closed=new java.util.ArrayList<>();
+   for(int i=0;i<WINDOW_KEYS.length;i++){
+     Integer v=code(raw,WINDOW_KEYS[i],0,100);
+     if(v==null)continue;
+     int now=v==0?0:1;
+     Integer old=update(WINDOW_KEYS[i],now);
+     if(old==null||old==now)continue;
+     if(now==1)opened.add(POSITIONS[i]);
+     else closed.add(POSITIONS[i]);
+   }
+   boolean armed=sentinelArmed();
+   if(!opened.isEmpty()&&(armed||enabled(app,WINDOWS))){
+     String label=opened.size()==1?"Ventana "+opened.get(0)+" abierta":opened.size()+" ventanas abiertas";
+     notifyUser((armed?"Centinela: ":"")+label,
+       "Ventanas abiertas: "+String.join(", ",opened)+
+       (armed?". Apertura observada, no confirma intrusión.":". Cambio recibido por MQTT."));
+   }
+   if(!closed.isEmpty()&&enabled(app,WINDOWS)){
+     String label=closed.size()==1?"Ventana "+closed.get(0)+" cerrada":closed.size()+" ventanas cerradas";
+     notifyUser(label,"Ventanas cerradas: "+String.join(", ",closed)+".");
+   }
  }
  private void charge(JSONObject raw){
    Integer ac=code(raw,"acChargeGunConnectionState",0,1);

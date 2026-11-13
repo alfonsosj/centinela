@@ -1,0 +1,102 @@
+package es.retalis.mazdaavisos;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import org.json.JSONObject;
+import java.util.Locale;
+
+/** Only a small local, non-identifying cache of the LAST observed vehicle values. */
+final class VehicleSnapshot {
+ private static final String PREF="vehicle_display";
+ static final int UNKNOWN=-1;
+ final Double soc,temp,range;
+ final int charge,lock,parked,windowsOpen,windowsKnown;
+ final long lastDataAt;
+ final int reports;
+ private VehicleSnapshot(SharedPreferences p){
+   soc=readDouble(p,"soc");temp=readDouble(p,"temp");range=readDouble(p,"range");
+   charge=p.getInt("charge",-1);lock=p.getInt("lock",-1);parked=p.getInt("parked",-1);
+   windowsOpen=p.getInt("windows_open",0);windowsKnown=p.getInt("windows_known",0);
+   lastDataAt=p.getLong("last_data_at",0L);reports=p.getInt("reports",0);
+ }
+ static VehicleSnapshot read(Context context){
+   return new VehicleSnapshot(context.getSharedPreferences(PREF,Context.MODE_PRIVATE));
+ }
+ private static Double readDouble(SharedPreferences p,String key){
+   return p.contains(key)?(double)p.getFloat(key,0):null;
+ }
+ private static Double number(JSONObject raw,String key,double min,double max){
+   Object obj=raw.opt(key);
+   if(obj==null||obj==JSONObject.NULL||obj instanceof Boolean)return null;
+   try{double d=Double.parseDouble(String.valueOf(obj));
+     return Double.isFinite(d)&&d>=min&&d<=max?d:null;
+   }catch(Exception ignored){return null;}
+ }
+ private static Double first(JSONObject raw,double min,double max,String... keys){
+   for(String key:keys){Double v=number(raw,key,min,max);if(v!=null)return v;}
+   return null;
+ }
+ private static Integer code(JSONObject raw,String key,int low,int high){
+   Double n=number(raw,key,low,high);
+   return n!=null&&n==Math.rint(n)?n.intValue():null;
+ }
+ static void observe(Context context,JSONObject raw){
+   if(raw==null||raw.length()==0)return;
+   SharedPreferences p=context.getSharedPreferences(PREF,Context.MODE_PRIVATE);
+   SharedPreferences.Editor e=p.edit();
+   boolean fresh=false;
+   Double soc=first(raw,0,100,"soc","socDsp","remainPower");
+   if(soc!=null){e.putFloat("soc",soc.floatValue());fresh=true;}
+   Double temp=number(raw,"vehicleTemperature",-30,80);
+   if(temp!=null&&temp!=0){e.putFloat("temp",temp.floatValue());fresh=true;}
+   Double range=first(raw,0,1500,"remainedPowerMile","totalResidualMileage");
+   if(range!=null){e.putFloat("range",range.floatValue());fresh=true;}
+   Integer locked=code(raw,"driverDoorLock",0,1);
+   if(locked!=null){e.putInt("lock",locked);fresh=true;}
+   Integer parked=code(raw,"carStatus",1,2);
+   if(parked!=null){e.putInt("parked",parked==2?1:0);fresh=true;}
+   Integer charge=code(raw,"batteryChargeStatus",0,10);
+   if(charge!=null){
+     if(charge==0)e.putInt("charge",0);
+     else if(charge==1)e.putInt("charge",1);
+     else if(charge==4)e.putInt("charge",2);
+     fresh=true;
+   }else{
+     charge=code(raw,"chargeStatus",0,10);
+     if(charge!=null){
+       if(charge==1)e.putInt("charge",1);
+       else if(charge==4)e.putInt("charge",2);
+       fresh=true;
+     }
+   }
+   final String[] keys={"diverWindow","passengerWindow","leftRearWindow","rightRearWindow"};
+   int windowsOpen=0,known=0;
+   for(int i=0;i<4;i++){
+     Integer v=code(raw,keys[i],0,100);
+     if(v!=null){e.putInt("window_"+i,v==0?0:1);fresh=true;}
+     int value=v!=null?(v==0?0:1):p.getInt("window_"+i,-1);
+     if(value>=0){known++;if(value==1)windowsOpen++;}
+   }
+   e.putInt("windows_open",windowsOpen).putInt("windows_known",known);
+   if(fresh){
+     e.putLong("last_data_at",System.currentTimeMillis());
+     e.putInt("reports",p.getInt("reports",0)+1);
+   }
+   e.apply();
+ }
+ String age(){
+   if(lastDataAt<=0)return "Sin datos recibidos todavía";
+   long secs=Math.max(0,(System.currentTimeMillis()-lastDataAt)/1000L);
+   if(secs<60)return "Datos de hace "+secs+" s";
+   if(secs<3600)return "Datos de hace "+(secs/60)+" min";
+   return "Datos de hace "+(secs/3600)+" h";
+ }
+ boolean stale(){return lastDataAt<=0||System.currentTimeMillis()-lastDataAt>20*60*1000L;}
+ String socText(){return soc==null?"—":String.format(Locale.getDefault(),"%.0f%%",soc);}
+ String tempText(){return temp==null?"—":String.format(Locale.getDefault(),"%.0f°",temp);}
+ String rangeText(){return range==null?"—":String.format(Locale.getDefault(),"%.0f km",range);}
+ String chargeText(){return charge==1?"Cargando":charge==2?"En espera":charge==0?"Sin cargar":"Estado no disponible";}
+ String doorText(){return lock==0?"Bloqueado":lock==1?"Desbloqueado":"Sin datos";}
+ String locationText(){return parked==1?"Aparcado":parked==0?"Estado no aparcado":"Estado no disponible";}
+ String windowText(){return windowsKnown==0?"Sin datos":windowsOpen+" abierta"+(windowsOpen==1?"":"s")+(windowsKnown<4?" · parcial":"");}
+}
