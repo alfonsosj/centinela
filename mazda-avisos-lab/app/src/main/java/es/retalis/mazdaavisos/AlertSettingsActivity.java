@@ -1,6 +1,7 @@
 package es.retalis.mazdaavisos;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -19,6 +20,12 @@ public final class AlertSettingsActivity extends Activity {
    TextView title=new TextView(this);title.setText("CONFIGURAR AVISOS MAZDA");
    title.setTextSize(22);title.setTextColor(Color.rgb(22,48,75));root.addView(title);
    explain("Los avisos se envían solo cuando Mazda comunica un cambio real al monitor. No requiere Home Assistant ni envía órdenes al vehículo.");
+   section("Acceso a notificaciones");
+   explain("Consulta el historial de avisos, revisa los permisos de Android y comprueba que puedes recibir notificaciones.");
+   destination("Abrir notificaciones",NotificationsActivity.class);
+   section("Ayuda");
+   explain("Instrucciones de conexión, PIN, monitor, controles del vehículo, ajustes de avisos y solución de problemas. Disponible sin conexión.");
+   destination("Instrucciones y funciones de la app",HelpActivity.class);
    section("Aperturas y seguridad");
    toggle("Bloqueo y desbloqueo de puertas",AlertRules.LOCKS);
    toggle("Apertura/cierre de puertas físicas",AlertRules.DOORS);
@@ -45,6 +52,11 @@ public final class AlertSettingsActivity extends Activity {
    threshold("Temperatura baja",AlertRules.LOW_TEMP,-10,15,1," °C");
    explain("La temperatura se basa en las lecturas recibidas del coche. Una temperatura extrema no confirma que haya personas en el interior. La aplicación no es un detector de ocupantes.");
    Button back=new Button(this);back.setText("Volver a Mazda Avisos Lab");root.addView(back);back.setOnClickListener(v->finish());
+ }
+ private void destination(String title,Class<? extends Activity> activity){
+   Button button=new Button(this);button.setText(title);button.setAllCaps(false);
+   root.addView(button,new LinearLayout.LayoutParams(-1,-2));
+   button.setOnClickListener(v->startActivity(new Intent(this,activity)));
  }
  private void section(String title){
    TextView t=new TextView(this);t.setText(title);t.setTextSize(19);

@@ -20,6 +20,8 @@
     android:value="Continuous user-initiated read-only MQTT subscription for immediate vehicle status change notifications. Cannot use periodic scheduled jobs for real-time alerts."/>
   </service>
   <activity android:name=".AlertSettingsActivity" android:exported="false"/>
+  <activity android:name=".NotificationsActivity" android:exported="false"/>
+  <activity android:name=".HelpActivity" android:exported="false"/>
   <activity android:name=".VehicleControlActivity" android:exported="false"/>
   <activity android:name=".ControlsActivity" android:exported="false"/>
   <activity android:name=".ClimateDashboardActivity" android:exported="false"/>

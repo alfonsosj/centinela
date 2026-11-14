@@ -1,4 +1,14 @@
-# Mazda Avisos Lab v0.12 — tablero visual
+# Mazda Avisos Lab
+
+## 1.1.7 — Notificaciones y Ayuda desde los ajustes
+
+- Dos apartados nuevos en los ajustes de avisos: acceso a Notificaciones y Ayuda.
+- Notificaciones reúne los permisos reales de Android, la categoría de avisos, una prueba local, acceso a los ajustes de batería y el historial local de los últimos 100 eventos. La prueba no representa un evento del coche ni se añade al historial.
+- Ayuda funciona sin conexión, con 17 temas desplegables y búsqueda sin distinción de acentos: configuración inicial, cuentas, PIN temporal, conexión, controles, paneles, avisos, recordatorios, accesibilidad, historial, privacidad y solución de problemas.
+- La ayuda refleja la caducidad real de la sesión de control a los 15 minutos y distingue las funciones implementadas de las pendientes de validación.
+- `versionCode 30`, misma firma estable para actualizar la 1.1.6 conservando datos.
+
+## v0.12 — tablero visual
 
 - Portada con ilustración vectorial original de un crossover y diseño de tarjetas inspirado en la organización de Mazda Europa (sin copiar sus imágenes o su identidad).
 - Batería y temperatura interior como indicadores principales; además autonomía, carga, bloqueo y ventanas cuando estén disponibles.
