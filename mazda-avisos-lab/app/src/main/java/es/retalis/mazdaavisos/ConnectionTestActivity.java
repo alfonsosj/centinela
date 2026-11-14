@@ -3,6 +3,8 @@ package es.retalis.mazdaavisos;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.ActivityNotFoundException;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
 import android.util.Base64;
@@ -66,12 +68,50 @@ public class ConnectionTestActivity extends Activity {
    emailField=new EditText(this);emailField.setSingleLine(true);emailField.setHint("Correo cuenta secundaria");emailField.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);root.addView(emailField);
    passwordField=new EditText(this);passwordField.setSingleLine(true);passwordField.setHint("Contraseña de cuenta secundaria");passwordField.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);root.addView(passwordField);
    loginButton=new Button(this);loginButton.setText("Conectar cuenta Mazda");root.addView(loginButton);loginButton.setOnClickListener(v->startLogin());
+   TextView accountHelp=new TextView(this);
+   accountHelp.setText("¿Todavía no tienes cuenta o no recuerdas la contraseña?");
+   accountHelp.setPadding(0,20,0,4);root.addView(accountHelp);
+   Button createAccount=new Button(this);
+   createAccount.setText("Crear cuenta nueva");
+   root.addView(createAccount);
+   createAccount.setOnClickListener(v->openOfficialAccountFlow(false));
+   Button resetPassword=new Button(this);
+   resetPassword.setText("Recuperar contraseña");
+   root.addView(resetPassword);
+   resetPassword.setOnClickListener(v->openOfficialAccountFlow(true));
    codeField=new EditText(this);codeField.setHint("Código recibido por email");codeField.setInputType(InputType.TYPE_CLASS_NUMBER);codeField.setVisibility(View.GONE);root.addView(codeField);
    verifyButton=new Button(this);verifyButton.setText("Verificar dispositivo");verifyButton.setVisibility(View.GONE);root.addView(verifyButton);verifyButton.setOnClickListener(v->verify());
    listenButton=new Button(this);listenButton.setText("Escuchar MQTT durante 2 minutos");listenButton.setVisibility(View.GONE);root.addView(listenButton);listenButton.setOnClickListener(v->listen());
    sessionButton=new Button(this);sessionButton.setText("Reiniciar monitor MQTT");sessionButton.setVisibility(View.GONE);root.addView(sessionButton);sessionButton.setOnClickListener(v->startSession());
    status=new TextView(this);status.setText("Sin realizar consultas.");status.setTextIsSelectable(true);status.setPadding(0,24,0,10);root.addView(status);
    Button close=new Button(this);close.setText("Cerrar diagnóstico");root.addView(close);close.setOnClickListener(v->finish());
+ }
+ /**
+  * Las cuentas se crean y recuperan exclusivamente en la app oficial de Mazda.
+  * No simulamos un registro local ni almacenamos contraseñas.
+  */
+ private void openOfficialAccountFlow(boolean resetPassword){
+   final String title=resetPassword?"Recuperar contraseña Mazda":"Crear cuenta Mazda";
+   final String explanation=resetPassword?
+     "Por seguridad, la recuperación se realiza en la aplicación oficial MAZDA 6e & CX-6e. Pulsa Continuar y selecciona la opción de contraseña olvidada en la pantalla de acceso. Después, vuelve aquí para conectar la cuenta.":
+     "El registro de una cuenta Mazda debe hacerse en la aplicación oficial MAZDA 6e & CX-6e. Pulsa Continuar para abrirla o instalarla. Regístrate allí y vincula tu vehículo con la ayuda del concesionario si es necesario. Después, vuelve aquí y conecta tu cuenta.";
+   new AlertDialog.Builder(this).setTitle(title).setMessage(explanation)
+     .setPositiveButton("Continuar",(dialog,which)->{
+       Intent official=getPackageManager().getLaunchIntentForPackage("com.cma.mazda.eu");
+       if(official!=null){
+         try{startActivity(official);return;}
+         catch(ActivityNotFoundException ignored){}
+       }
+       Intent store=new Intent(Intent.ACTION_VIEW,
+         Uri.parse("https://play.google.com/store/apps/details?id=com.cma.mazda.eu"));
+       try{startActivity(store);}
+       catch(ActivityNotFoundException notFound){
+         new AlertDialog.Builder(this).setTitle("No se puede abrir Mazda")
+           .setMessage("Instala MAZDA 6e & CX-6e desde Google Play y vuelve a esta pantalla.")
+           .setPositiveButton("Entendido",null).show();
+       }
+     })
+     .setNegativeButton("Cancelar",null).show();
  }
  private void say(String text){previousMessage=text;runOnUiThread(()->status.setText(text));}
  private void busy(boolean on){runOnUiThread(()->{loginButton.setEnabled(!on);verifyButton.setEnabled(!on);listenButton.setEnabled(!on);sessionButton.setEnabled(!on);});}
