@@ -15,6 +15,30 @@ import javax.net.ssl.HttpsURLConnection;
 
 /** Reuses the already tested Mazda Europe command protocol for in-place controls. */
 final class MazdaRemoteApi {
+ static final String WINDOWS_OPEN=VehicleControlActivity.WINDOWS_OPEN,WINDOWS_CLOSE=VehicleControlActivity.WINDOWS_CLOSE;
+ static final String TRUNK_OPEN=VehicleControlActivity.TRUNK_OPEN,TRUNK_CLOSE=VehicleControlActivity.TRUNK_CLOSE;
+ static final String CLIMATE_ON=VehicleControlActivity.CLIMATE_ON,CLIMATE_OFF=VehicleControlActivity.CLIMATE_OFF;
+ static final String FIND=VehicleControlActivity.FIND,HORN=VehicleControlActivity.HORN;
+ static final String DEFROST_ON=VehicleControlActivity.DEFROST_ON,DEFROST_OFF=VehicleControlActivity.DEFROST_OFF;
+ static final String WHEEL_ON=VehicleControlActivity.WHEEL_ON,WHEEL_OFF=VehicleControlActivity.WHEEL_OFF;
+ static final String CHARGE_LIMIT=VehicleControlActivity.CHARGE_LIMIT;
+ static final String DRIVER_HEAT=VehicleControlActivity.DRIVER_HEAT,PASSENGER_HEAT=VehicleControlActivity.PASSENGER_HEAT;
+ static final String DRIVER_VENT=VehicleControlActivity.DRIVER_VENT,PASSENGER_VENT=VehicleControlActivity.PASSENGER_VENT;
+ private static boolean protectedAction(String a){
+  return WINDOWS_OPEN.equals(a)||WINDOWS_CLOSE.equals(a)||TRUNK_OPEN.equals(a)||TRUNK_CLOSE.equals(a);
+ }
+ private static String actionName(String a){
+   if(WINDOWS_OPEN.equals(a))return "Abrir ventanillas";
+   if(WINDOWS_CLOSE.equals(a))return "Cerrar ventanillas";
+   if(TRUNK_OPEN.equals(a))return "Abrir maletero";
+   if(TRUNK_CLOSE.equals(a))return "Cerrar maletero";
+   if(CLIMATE_ON.equals(a))return "Activar climatización";
+   if(CLIMATE_OFF.equals(a))return "Apagar climatización";
+   if(CHARGE_LIMIT.equals(a))return "Ajustar límite de carga";
+   if(DEFROST_ON.equals(a))return "Activar desempañado";
+   if(DEFROST_OFF.equals(a))return "Apagar desempañado";
+   return a;
+ }
  private static final String ROOT="https://cma-m.iov.changanauto.com.de/cma-app-gw";
  private final Context context;
  private final Consumer<String> update;
