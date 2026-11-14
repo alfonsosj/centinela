@@ -24,6 +24,8 @@ public final class AlertSettingsActivity extends Activity {
    toggle("Apertura/cierre de puertas físicas",AlertRules.DOORS);
    toggle("Recordarme cada minuto si está aparcado y hay puertas abiertas o desbloqueado",AlertRules.PARKED_OPEN_REMINDER);
    explain("Con este ajuste activo, si MQTT confirma que el coche está aparcado y permanece una puerta abierta o el vehículo desbloqueado, recibirás un recordatorio tras el primer minuto y otro cada minuto mientras siga así. Se detiene al cerrar y bloquear; necesita el monitor MQTT conectado y datos del coche. No sustituye una alarma.");
+   toggle("Avisar cada minuto si el coche está bloqueado y alguna ventanilla abierta",AlertRules.LOCKED_WINDOW_REMINDER);
+   explain("Recordatorio independiente: tras un minuto con el vehículo bloqueado y una o varias ventanillas abiertas, avisa cada minuto hasta que Mazda informe de que se han cerrado todas o el coche esté desbloqueado. Necesita el monitor MQTT activo y estados recibidos en la sesión actual.");
    toggle("Apertura/cierre de ventanas",AlertRules.WINDOWS);
    toggle("Apertura/cierre de maletero",AlertRules.TRUNK);
    toggle("Centinela básico (avisos destacados de aperturas)",AlertRules.SENTINEL);
