@@ -274,9 +274,11 @@ public final class VehicleControlActivity extends Activity {
    return new DoorResult("Mazda ha aceptado la orden, pero aún NO ha confirmado el estado de ambas puertas. Compruébalo en la aplicación oficial.");
  }
 
- private DoorResult executeAdvanced(ControlSession.State s,String pin,String cmd,int temp)throws Exception{
+ private DoorResult executeAdvanced(ControlSession.State s,String pin,String cmd,int temp,int chargeLimit,int seat)throws Exception{
    boolean protectedCommand=protectedAction(cmd);
    String name,kind;
+   boolean chargeControl=CHARGE_LIMIT.equals(cmd);
+   String serialType=chargeControl?"2":"1";
    JSONObject values=new JSONObject();
    switch(cmd){
      case WINDOWS_OPEN: case WINDOWS_CLOSE:
@@ -286,6 +288,24 @@ public final class VehicleControlActivity extends Activity {
      case CLIMATE_ON: case CLIMATE_OFF:
        name="air-conditioner";kind="climatización";
        values.put("enabled",CLIMATE_ON.equals(cmd));values.put("targetTemp",temp*10);values.put("runTime",15);break;
+     case FIND: case HORN:
+       name="flashing-honking";kind="localización";
+       values.put("type",FIND.equals(cmd)?1:3);break;
+     case DEFROST_ON: case DEFROST_OFF:
+       name="defrost";kind="desempañado";values.put("enabled",DEFROST_ON.equals(cmd));break;
+     case WHEEL_ON: case WHEEL_OFF:
+       name="steering-wheel/heat";kind="volante";values.put("open",WHEEL_ON.equals(cmd));break;
+     case DRIVER_HEAT: case PASSENGER_HEAT: case DRIVER_VENT: case PASSENGER_VENT:
+       boolean heat=DRIVER_HEAT.equals(cmd)||PASSENGER_HEAT.equals(cmd);
+       boolean driver=DRIVER_HEAT.equals(cmd)||DRIVER_VENT.equals(cmd);
+       name="seats/"+(heat?"heat":"wind");kind="asiento";
+       values.put((driver?"master":"copilot")+"Switch",seat>0?1:0);
+       values.put((driver?"master":"copilot")+"Level",Math.max(1,Math.min(3,seat)));break;
+     case CHARGE_LIMIT:
+       name="charge/percentage";kind="límite de carga";
+       if(chargeLimit<60||chargeLimit>100)throw new IOException("Límite de carga fuera de rango");
+       values.put("chargePercentageMax",chargeLimit).put("command","charge_max").put("rcToken","");
+       break;
      default:throw new IOException("Control no permitido");
    }
    String rc="";
@@ -299,7 +319,7 @@ public final class VehicleControlActivity extends Activity {
      if(rc.isEmpty())throw new IOException("El PIN de control no fue autorizado");
    }
    say("Solicitando autorización para "+kind+"…");
-   JSONObject enc=post(s,"/cma-app-car-control/api/serial-no/get",new JSONObject().put("type","1"));
+   JSONObject enc=post(s,"/cma-app-car-control/api/serial-no/get",new JSONObject().put("type",serialType));
    String cipherText=enc.optString("data","");
    if(cipherText.isEmpty())throw new IOException("Mazda no entregó el identificador cifrado");
    Cipher cipher=Cipher.getInstance("RSA/ECB/PKCS1Padding");
@@ -307,9 +327,11 @@ public final class VehicleControlActivity extends Activity {
    String serial=new String(cipher.doFinal(Base64.decode(cipherText,Base64.DEFAULT)),StandardCharsets.UTF_8);
    values.put("seriralNo",serial).put("vehicleId",s.vehicleId);
    if(protectedCommand)values.put("rcToken",rc);
-   sign(values,s.privateKey);
+   sign(values,s.privateKey,chargeControl);
    say("Enviando solicitud a Mazda…");
-   JSONObject sent=post(s,"/cma-app-car-control/api/control/"+name,values);
+   JSONObject sent=post(s,chargeControl?
+     "/cma-app-car-control/api/charge/percentage":
+     "/cma-app-car-control/api/control/"+name,values);
    JSONObject data=sent.optJSONObject("data");
    String id=data==null?"":data.optString("commandId","");
    if(id.isEmpty())throw new IOException("Mazda no devolvió identificador de la orden");
@@ -321,6 +343,16 @@ public final class VehicleControlActivity extends Activity {
      if(details==null||!details.has("resultCode"))throw new IOException("Respuesta de control sin resultado");
      int code=details.optInt("resultCode",Integer.MIN_VALUE);
      if(code==0||((CLIMATE_ON.equals(cmd)||CLIMATE_OFF.equals(cmd))&&code==1015)){accepted=true;break;}
+     if(chargeControl&&code==1000){
+       JSONObject current=post(s,"/cma-app-car-condition/api/vehicle/condition/v2",allStatusRequest(s.vehicleId));
+       JSONObject currentData=current.optJSONObject("data");
+       JSONObject charge=currentData==null?null:currentData.optJSONObject("charge");
+       if(charge!=null&&charge.optInt("maxSocPercent",-1)==chargeLimit){
+         VehicleSnapshot.observeApi(this,currentData);
+         return new DoorResult("Límite de carga confirmado: "+chargeLimit+" %.");
+       }
+       throw new IOException("La API respondió 1000 pero no se ha verificado el nuevo límite");
+     }
      if(code!=-100)throw new IOException("Mazda rechazó la operación (código "+code+")");
      Thread.sleep(1000L);
    }
@@ -333,15 +365,20 @@ public final class VehicleControlActivity extends Activity {
        JSONObject status=result.optJSONObject("data");
        if(status==null)continue;
        VehicleSnapshot.observeApi(this,status);
-       if(matches(status,cmd,temp))return new DoorResult(actionName(cmd)+": CONFIRMADO en el estado Mazda.");
+       if(matches(status,cmd,temp,chargeLimit,seat))return new DoorResult(actionName(cmd)+": CONFIRMADO en el estado Mazda.");
      }catch(Exception ignored){}
    }
-   return new DoorResult("Mazda aceptó la orden, pero aún NO ha confirmado el cambio de "+kind+". Compruébalo en la app oficial.");
+   return new DoorResult(FIND.equals(cmd)||HORN.equals(cmd)?
+     "Mazda aceptó la señal. No es posible verificar físicamente su ejecución desde la API.":
+     "Mazda aceptó la orden, pero aún NO se ha confirmado el cambio de "+kind+". Compruébalo en la app oficial.");
  }
- private static void sign(JSONObject payload,PrivateKey key)throws Exception{
+ private static void sign(JSONObject payload,PrivateKey key,boolean specialCharge)throws Exception{
    java.util.List<String> keys=new java.util.ArrayList<>();
    java.util.Iterator<String> it=payload.keys();
-   while(it.hasNext()){String k=it.next();if(!k.equals("sign"))keys.add(k);}
+   while(it.hasNext()){
+     String k=it.next();
+     if(!k.equals("sign")&&!(specialCharge&&(k.equals("command")||k.equals("rcToken"))))keys.add(k);
+   }
    java.util.Collections.sort(keys);
    StringBuilder canonical=new StringBuilder();
    for(String k:keys){
@@ -353,7 +390,7 @@ public final class VehicleControlActivity extends Activity {
    signature.initSign(key);signature.update(canonical.toString().getBytes(StandardCharsets.UTF_8));
    payload.put("sign",Base64.encodeToString(signature.sign(),Base64.DEFAULT));
  }
- private static boolean matches(JSONObject status,String action,int temp){
+ private static boolean matches(JSONObject status,String action,int temp,int chargeLimit,int seat){
    if(action.startsWith("windows")){
      JSONObject windows=status.optJSONObject("window");
      org.json.JSONArray a=windows==null?null:windows.optJSONArray("windows");
@@ -385,10 +422,27 @@ public final class VehicleControlActivity extends Activity {
      }
      return true;
    }
+   if(CHARGE_LIMIT.equals(action)){
+     JSONObject charge=status.optJSONObject("charge");
+     return charge!=null&&charge.optInt("maxSocPercent",-1)==chargeLimit;
+   }
+   if(DEFROST_ON.equals(action)||DEFROST_OFF.equals(action)){
+     JSONObject hvac=status.optJSONObject("hvac");
+     return hvac!=null&&hvac.optInt("defrostStatus",-1)==(DEFROST_ON.equals(action)?1:0);
+   }
+   if(WHEEL_ON.equals(action)||WHEEL_OFF.equals(action)){
+     JSONObject hvac=status.optJSONObject("hvac");
+     return hvac!=null&&hvac.optInt("steeringWheelHeat",-1)==(WHEEL_ON.equals(action)?1:0);
+   }
+   if(action.startsWith("driver_")||action.startsWith("passenger_")){
+     JSONObject seats=status.optJSONObject("seat");
+     JSONObject position=seats==null?null:seats.optJSONObject(action.startsWith("driver_")?"leftFront":"rightFront");
+     return position!=null&&position.optInt(action.endsWith("_heat")?"heatStatus":"ventStatus",-1)==seat;
+   }
    return false;
  }
  private static JSONObject allStatusRequest(String vehicleId)throws Exception{
-   JSONObject criteria=new JSONObject().put("seat","0").put("tire","0").put("charge","1")
+   JSONObject criteria=new JSONObject().put("seat","1").put("tire","0").put("charge","1")
      .put("vehicleStatus","1").put("hvac","1").put("departurePlan","0").put("fuel","0")
      .put("window","1").put("door","1").put("airConditionPlan","0").put("lamp","0")
      .put("warmCoolingBox","0").put("welcome","0").put("location","0");
