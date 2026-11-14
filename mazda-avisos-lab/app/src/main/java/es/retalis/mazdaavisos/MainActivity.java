@@ -260,11 +260,14 @@ public final class MainActivity extends Activity {
      remote(now.lock==0?VehicleControlActivity.UNLOCK:VehicleControlActivity.LOCK);
    });
    int windowsStatus=v.windowsKnown<4||v.stale()?-1:v.windowsOpen>0?1:0;
-   controlCircle(buttons,"Ventanas",VehicleStateIconView.WINDOWS,windowsStatus,()->vehicleDetail(VehicleSnapshot.read(this),"windows"));
+   controlCircle(buttons,"Ventanas",VehicleStateIconView.WINDOWS,windowsStatus,
+     ()->startActivity(new Intent(this,ControlsActivity.class)));
    int trunkStatus=v.trunk<0||v.stale()?-1:v.trunk==1?1:0;
-   controlCircle(buttons,"Maletero",VehicleStateIconView.TRUNK,trunkStatus,()->vehicleDetail(VehicleSnapshot.read(this),"trunk"));
+   controlCircle(buttons,"Maletero",VehicleStateIconView.TRUNK,trunkStatus,
+     ()->startActivity(new Intent(this,ControlsActivity.class)));
    int climateStatus=v.climate<0||v.stale()?-1:v.climate==1?1:0;
-   controlCircle(buttons,"Clima",VehicleStateIconView.CLIMATE,climateStatus,()->vehicleDetail(VehicleSnapshot.read(this),"climate"));
+   controlCircle(buttons,"Clima",VehicleStateIconView.CLIMATE,climateStatus,
+     ()->startActivity(new Intent(this,ControlsActivity.class)));
 
    LinearLayout metrics=horizontal();
    LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(-1,-2);mp.bottomMargin=dp(14);root.addView(metrics,mp);
@@ -286,9 +289,10 @@ public final class MainActivity extends Activity {
 
    LinearLayout remoteExtras=card();
    label(remoteExtras,"Más controles del vehículo",17,INK,true);
-   TextView extraInfo=text("Localizar, bocina, desempañado, volante, asientos y límite de carga. Funciones experimentales sujetas a compatibilidad Mazda.",12,MUTED,false);
+   TextView extraInfo=text("Puertas, ventanas, maletero, clima, localización, asientos y límite de carga. Solo el control de puertas está verificado en tu coche.",12,MUTED,false);
    LinearLayout.LayoutParams xip=new LinearLayout.LayoutParams(-1,-2);xip.topMargin=dp(7);remoteExtras.addView(extraInfo,xip);
-   action(remoteExtras,"Abrir todos los controles",this::extras,false);
+   action(remoteExtras,"Abrir panel completo de controles",
+      ()->startActivity(new Intent(this,ControlsActivity.class)),true);
    LinearLayout activity=card();
    label(activity,"Actividad reciente",17,INK,true);
    JSONArray events=AlertHistory.read(this);
@@ -349,7 +353,7 @@ public final class MainActivity extends Activity {
      android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
      if(clipboard!=null)clipboard.setPrimaryClip(ClipData.newPlainText("Diagnóstico Mazda",Data.technicalDiagnostic(this)));
    });
-   TextView disclaimer=text("Mazda Avisos 1.0 RC · Datos y alertas sujetos a conexión. Los controles adicionales no están validados en este vehículo. No sustituye el sistema oficial ni una alarma.",11,MUTED,false);
+   TextView disclaimer=text("Mazda Avisos 1.0 RC2 · Datos y alertas sujetos a conexión. Los controles adicionales no están validados en este vehículo. No sustituye el sistema oficial ni una alarma.",11,MUTED,false);
    disclaimer.setPadding(0,dp(4),0,dp(6));root.addView(disclaimer);
  }
  @Override public void onRequestPermissionsResult(int code,String[] perms,int[] results){
