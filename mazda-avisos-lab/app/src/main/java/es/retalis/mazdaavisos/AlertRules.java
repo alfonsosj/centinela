@@ -326,9 +326,9 @@ final class AlertRules {
    windowReminderCount++;
    String which=opened.size()==1?"la ventanilla del "+opened.get(0):
      opened.size()+" ventanillas ("+String.join(", ",opened)+")";
-   String title="Mazda cerrado con ventanilla abierta";
-   String body="El coche sigue bloqueado, pero tiene abierta "+which+
-     ". Aviso número "+windowReminderCount+". Comprueba la última lectura MQTT y cierra las ventanillas.";
+   String title="Mazda bloqueado con ventanillas abiertas";
+   String body="El coche sigue bloqueado, pero "+(opened.size()==1?"tiene abierta ":"tiene abiertas ")+which+
+     ". Recordatorio "+windowReminderCount+". Comprueba el coche y cierra las ventanillas.";
    // Reuse one notification slot to avoid dozens of identical notifications in
    // Android's notification shade; the content changes on every reminder.
    MainActivity.alert(app,title,body,WINDOW_REMINDER_NOTIFICATION_ID);
