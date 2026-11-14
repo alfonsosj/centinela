@@ -25,11 +25,16 @@ import javax.net.ssl.HttpsURLConnection;
 /** Bloqueo/desbloqueo autorizado con PIN y confirmación explícita. */
 public final class VehicleControlActivity extends Activity {
  static final String EXTRA_ACTION="desired_control";
- static final String LOCK="lock",UNLOCK="unlock";
+ static final String LOCK="lock",UNLOCK="unlock",
+   WINDOWS_OPEN="windows_open",WINDOWS_CLOSE="windows_close",
+   TRUNK_OPEN="trunk_open",TRUNK_CLOSE="trunk_close",
+   CLIMATE_ON="climate_on",CLIMATE_OFF="climate_off";
  private static final String ROOT="https://cma-m.iov.changanauto.com.de/cma-app-gw";
  private final ExecutorService worker=Executors.newSingleThreadExecutor();
  private TextView state;
  private EditText pinInput;
+ private android.widget.SeekBar climateTarget;
+ private int temperature=21;
  private Button sendButton;
  private String action;
  private volatile boolean busy=false;
@@ -42,8 +47,29 @@ public final class VehicleControlActivity extends Activity {
  @Override public void onCreate(Bundle saved){
    super.onCreate(saved);
    action=getIntent().getStringExtra(EXTRA_ACTION);
-   if(!LOCK.equals(action)&&!UNLOCK.equals(action)){finish();return;}
+   if(!knownAction(action)){finish();return;}
    show();
+ }
+ private static boolean protectedAction(String action){
+   return LOCK.equals(action)||UNLOCK.equals(action)||
+     WINDOWS_OPEN.equals(action)||WINDOWS_CLOSE.equals(action)||
+     TRUNK_OPEN.equals(action)||TRUNK_CLOSE.equals(action);
+ }
+ private static boolean knownAction(String action){
+   return protectedAction(action)||CLIMATE_ON.equals(action)||CLIMATE_OFF.equals(action);
+ }
+ private static String actionName(String action){
+   switch(action){
+     case LOCK: return "Bloquear puertas";
+     case UNLOCK: return "Desbloquear puertas";
+     case WINDOWS_OPEN: return "Abrir ventanillas";
+     case WINDOWS_CLOSE: return "Cerrar ventanillas";
+     case TRUNK_OPEN: return "Abrir maletero";
+     case TRUNK_CLOSE: return "Cerrar maletero";
+     case CLIMATE_ON: return "Activar climatización";
+     case CLIMATE_OFF: return "Apagar climatización";
+     default: return "Acción no reconocida";
+   }
  }
  private void say(String s){runOnUiThread(()->{if(state!=null)state.setText(s);});}
  private void show(){
@@ -55,9 +81,11 @@ public final class VehicleControlActivity extends Activity {
    caption.setPadding(0,dp(12),0,dp(22));root.addView(caption);
    LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(18),dp(22),dp(18),dp(22));
    card.setBackground(round(Color.WHITE));root.addView(card);
-   boolean locking=LOCK.equals(action);
-   card.addView(text(locking?"🔒  Bloquear puertas":"🔓  Desbloquear puertas",20,true));
-   TextView instruction=text("Introduce el PIN de control de 6 cifras configurado en Mazda. Se utiliza solo para autorizar esta orden y no se guarda.",14,false);
+   boolean needsPin=protectedAction(action);
+   card.addView(text(actionName(action),20,true));
+   TextView instruction=text(needsPin?
+     "Introduce el PIN de control Mazda de 6 cifras. Se utiliza solo para autorizar esta orden y nunca se almacena.":
+     "La climatización utiliza una orden firmada de Mazda. No requiere el PIN, pero siempre pedirá confirmación.",14,false);
    instruction.setPadding(0,dp(14),0,dp(12));card.addView(instruction);
    state=text("Sin enviar órdenes al vehículo.",13,false);card.addView(state);
    ControlSession.State s=ControlSession.get();
@@ -70,13 +98,29 @@ public final class VehicleControlActivity extends Activity {
        startActivity(i);finish();
      });
    } else {
-     pinInput=new EditText(this);
-     pinInput.setHint("PIN Mazda · 6 cifras");
-     pinInput.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-     pinInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(6)});
-     card.addView(pinInput);
+     if(needsPin){
+       pinInput=new EditText(this);
+       pinInput.setHint("PIN Mazda · 6 cifras");
+       pinInput.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+       pinInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(6)});
+       card.addView(pinInput);
+     }
+     if(CLIMATE_ON.equals(action)){
+       TextView target=text("Temperatura objetivo: 21 °C",15,true);
+       card.addView(target);
+       climateTarget=new SeekBar(this);climateTarget.setMax(28);climateTarget.setProgress(10);
+       climateTarget.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+         @Override public void onProgressChanged(SeekBar bar,int progress,boolean user){
+           temperature=16+progress/2;
+           target.setText("Temperatura objetivo: "+temperature+" °C");
+         }
+         @Override public void onStartTrackingTouch(SeekBar bar){}
+         @Override public void onStopTrackingTouch(SeekBar bar){}
+       });
+       card.addView(climateTarget);
+     }
      sendButton=new Button(this);
-     sendButton.setText(locking?"Solicitar bloqueo":"Solicitar desbloqueo");
+     sendButton.setText("Solicitar: "+actionName(action));
      card.addView(sendButton);
      sendButton.setOnClickListener(v->confirm());
      TextView status=text("La respuesta de Mazda se verificará antes de indicar el resultado. No se mostrará un cierre confirmado sin una lectura posterior del vehículo.",12,false);
@@ -86,18 +130,24 @@ public final class VehicleControlActivity extends Activity {
    back.setOnClickListener(v->finish());
  }
  private void confirm(){
-   if(busy||pinInput==null)return;
-   String pin=pinInput.getText().toString();
-   pinInput.setText("");
-   if(!pin.matches("[0-9]{6}")){say("El PIN debe tener exactamente 6 cifras.");return;}
+   if(busy)return;
+   boolean needsPin=protectedAction(action);
+   String pin=needsPin&&pinInput!=null?pinInput.getText().toString():"";
+   if(pinInput!=null)pinInput.setText("");
+   if(needsPin&&!pin.matches("[0-9]{6}")){say("El PIN debe tener exactamente 6 cifras.");return;}
    ControlSession.State session=ControlSession.get();
    if(session==null){say("La sesión de control ha caducado. Inicia sesión otra vez.");return;}
    boolean unlock=UNLOCK.equals(action);
+   boolean isDoors=LOCK.equals(action)||UNLOCK.equals(action);
+   String safety=action.equals(WINDOWS_OPEN)||action.equals(WINDOWS_CLOSE)||
+       action.equals(TRUNK_OPEN)||action.equals(TRUNK_CLOSE)?
+     "Asegúrate de que no hay personas, animales ni obstáculos cerca de las ventanillas o el portón. Esta orden puede mover elementos físicos y generar riesgos.":
+     unlock?"Desbloqueará el vehículo. Confirma que estás en un lugar seguro.":
+     LOCK.equals(action)?"Comprueba que nadie necesite salir del coche.":
+     "La climatización puede consumir batería. Comprueba que el vehículo está aparcado.";
    new AlertDialog.Builder(this)
-     .setTitle(unlock?"¿Desbloquear puertas?":"¿Bloquear puertas?")
-     .setMessage(unlock?
-       "Vas a desbloquear físicamente el vehículo. Asegúrate de que está en un lugar seguro y de tener control sobre quién puede acceder.":
-       "Vas a solicitar el bloqueo de las puertas. Comprueba que no haya personas que necesiten salir.")
+     .setTitle("¿"+actionName(action)+"?")
+     .setMessage(safety+" Esta operación requiere tu confirmación explícita.")
      .setNegativeButton("Cancelar",(d,w)->{})
      .setPositiveButton("Confirmar", (d,w)->{
        busy=true;sendButton.setEnabled(false);
@@ -175,6 +225,128 @@ public final class VehicleControlActivity extends Activity {
      }catch(Exception ignored){/* show awaiting status rather than inventing success */}
    }
    return new DoorResult("Mazda ha aceptado la orden, pero aún NO ha confirmado el estado de ambas puertas. Compruébalo en la aplicación oficial.");
+ }
+
+ private DoorResult executeAdvanced(ControlSession.State s,String pin,String cmd,int temp)throws Exception{
+   boolean protectedCommand=protectedAction(cmd);
+   String name,kind;
+   JSONObject values=new JSONObject();
+   switch(cmd){
+     case WINDOWS_OPEN: case WINDOWS_CLOSE:
+       name="windows";kind="ventanillas";values.put("open",WINDOWS_OPEN.equals(cmd));break;
+     case TRUNK_OPEN: case TRUNK_CLOSE:
+       name="trunk";kind="maletero";values.put("open",TRUNK_OPEN.equals(cmd));break;
+     case CLIMATE_ON: case CLIMATE_OFF:
+       name="air-conditioner";kind="climatización";
+       values.put("enabled",CLIMATE_ON.equals(cmd));values.put("targetTemp",temp*10);values.put("runTime",15);break;
+     default:throw new IOException("Control no permitido");
+   }
+   String rc="";
+   if(protectedCommand){
+     JSONObject checked=post(s,"/cma-app-car-control/api/security-code/check-code",
+       new JSONObject().put("safeCode",ConnectionTestActivity.encrypt(
+         KeyFactory.getInstance("RSA").generatePublic(
+           new X509EncodedKeySpec(Base64.decode(ConnectionTestActivity.SERVER_RSA,Base64.DEFAULT))),pin)));
+     JSONObject data=checked.optJSONObject("data");
+     rc=data==null?"":data.optString("rcToken","");
+     if(rc.isEmpty())throw new IOException("El PIN de control no fue autorizado");
+   }
+   say("Solicitando autorización para "+kind+"…");
+   JSONObject enc=post(s,"/cma-app-car-control/api/serial-no/get",new JSONObject().put("type","1"));
+   String cipherText=enc.optString("data","");
+   if(cipherText.isEmpty())throw new IOException("Mazda no entregó el identificador cifrado");
+   Cipher cipher=Cipher.getInstance("RSA/ECB/PKCS1Padding");
+   cipher.init(Cipher.DECRYPT_MODE,s.privateKey);
+   String serial=new String(cipher.doFinal(Base64.decode(cipherText,Base64.DEFAULT)),StandardCharsets.UTF_8);
+   values.put("seriralNo",serial).put("vehicleId",s.vehicleId);
+   if(protectedCommand)values.put("rcToken",rc);
+   sign(values,s.privateKey);
+   say("Enviando solicitud a Mazda…");
+   JSONObject sent=post(s,"/cma-app-car-control/api/control/"+name,values);
+   JSONObject data=sent.optJSONObject("data");
+   String id=data==null?"":data.optString("commandId","");
+   if(id.isEmpty())throw new IOException("Mazda no devolvió identificador de la orden");
+   boolean accepted=false;
+   for(int i=0;i<15;i++){
+     JSONObject response=post(s,"/cma-app-car-control/api/control/control-result",
+       new JSONObject().put("commandId",id).put("vehicleId",s.vehicleId));
+     JSONObject details=response.optJSONObject("data");
+     if(details==null||!details.has("resultCode"))throw new IOException("Respuesta de control sin resultado");
+     int code=details.optInt("resultCode",Integer.MIN_VALUE);
+     if(code==0||((CLIMATE_ON.equals(cmd)||CLIMATE_OFF.equals(cmd))&&code==1015)){accepted=true;break;}
+     if(code!=-100)throw new IOException("Mazda rechazó la operación (código "+code+")");
+     Thread.sleep(1000L);
+   }
+   if(!accepted)return new DoorResult("No se ha confirmado la ejecución: Mazda no finalizó la orden.");
+   say("Mazda ha aceptado la solicitud. Comprobando estado del coche…");
+   for(int i=0;i<3;i++){
+     if(i>0)Thread.sleep(2500L);
+     try{
+       JSONObject result=post(s,"/cma-app-car-condition/api/vehicle/condition/v2",allStatusRequest(s.vehicleId));
+       JSONObject status=result.optJSONObject("data");
+       if(status==null)continue;
+       VehicleSnapshot.observeApi(this,status);
+       if(matches(status,cmd,temp))return new DoorResult(actionName(cmd)+": CONFIRMADO en el estado Mazda.");
+     }catch(Exception ignored){}
+   }
+   return new DoorResult("Mazda aceptó la orden, pero aún NO ha confirmado el cambio de "+kind+". Compruébalo en la app oficial.");
+ }
+ private static void sign(JSONObject payload,PrivateKey key)throws Exception{
+   java.util.List<String> keys=new java.util.ArrayList<>();
+   java.util.Iterator<String> it=payload.keys();
+   while(it.hasNext()){String k=it.next();if(!k.equals("sign"))keys.add(k);}
+   java.util.Collections.sort(keys);
+   StringBuilder canonical=new StringBuilder();
+   for(String k:keys){
+     if(canonical.length()>0)canonical.append("&");
+     Object value=payload.get(k);
+     canonical.append(k).append("=").append(value instanceof Boolean?String.valueOf(value).toLowerCase(java.util.Locale.ROOT):String.valueOf(value));
+   }
+   Signature signature=Signature.getInstance("SHA256withRSA");
+   signature.initSign(key);signature.update(canonical.toString().getBytes(StandardCharsets.UTF_8));
+   payload.put("sign",Base64.encodeToString(signature.sign(),Base64.DEFAULT));
+ }
+ private static boolean matches(JSONObject status,String action,int temp){
+   if(action.startsWith("windows")){
+     JSONObject windows=status.optJSONObject("window");
+     org.json.JSONArray a=windows==null?null:windows.optJSONArray("windows");
+     if(a==null||a.length()<4)return false;
+     boolean expected=WINDOWS_OPEN.equals(action);
+     for(int i=0;i<4;i++){
+       Object value=a.opt(i);
+       if(value==null||value==JSONObject.NULL)return false;
+       int n;
+       try{n=Integer.parseInt(value.toString());}catch(Exception e){return false;}
+       if(expected?(n<=0):(n!=0))return false;
+     }
+     return true;
+   }
+   if(action.startsWith("trunk")){
+     JSONObject door=status.optJSONObject("door");
+     if(door==null)return false;
+     int trunk=door.optInt("trunk",-1);
+     return trunk==(TRUNK_OPEN.equals(action)?1:0);
+   }
+   if(action.startsWith("climate")){
+     JSONObject hvac=status.optJSONObject("hvac");
+     if(hvac==null)return false;
+     int ac=hvac.optInt("acStatus",-1);
+     if(ac!=(CLIMATE_ON.equals(action)?1:0))return false;
+     if(CLIMATE_ON.equals(action)){
+       int target=hvac.optInt("remoteTemp",-10000);
+       return target!=-10000&&Math.abs(target-temp*10)<=5;
+     }
+     return true;
+   }
+   return false;
+ }
+ private static JSONObject allStatusRequest(String vehicleId)throws Exception{
+   JSONObject criteria=new JSONObject().put("seat","0").put("tire","0").put("charge","1")
+     .put("vehicleStatus","1").put("hvac","1").put("departurePlan","0").put("fuel","0")
+     .put("window","1").put("door","1").put("airConditionPlan","0").put("lamp","0")
+     .put("warmCoolingBox","0").put("welcome","0").put("location","0");
+   Object id=vehicleId.matches("[0-9]{1,18}")?Long.valueOf(vehicleId):vehicleId;
+   return new JSONObject().put("vechileCriteria",criteria).put("vehicleId",id);
  }
  private static JSONObject statusRequest(String vehicleId)throws Exception{
    JSONObject criteria=new JSONObject().put("seat","0").put("tire","0").put("charge","0")
