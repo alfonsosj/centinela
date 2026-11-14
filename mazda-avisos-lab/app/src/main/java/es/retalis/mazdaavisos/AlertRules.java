@@ -20,6 +20,7 @@ final class AlertRules {
  static final String CHARGE="charge", CABLE="cable", SOC="soc", TEMP="temp";
  static final String SENTINEL="sentinel", PARK_DROP="park_drop";
  static final String PARKED_OPEN_REMINDER="parked_open_reminder";
+ static final String LOCKED_WINDOW_REMINDER="locked_window_reminder";
  static final String LOW_SOC="low_soc", STEP_SOC="step_soc", HIGH_TEMP="high_temp";
  static final String LOW_TEMP="low_temp", DROP_POINTS="drop_points";
  private static final AtomicInteger ID=new AtomicInteger(6100);
@@ -36,6 +37,10 @@ final class AlertRules {
  // in this MQTT connection; a reconnection never reuses previous open states.
  private long parkedObservedAt=0,lockObservedAt=0,reminderStartedAt=0,lastReminderAt=0;
  private final long[] doorObservedAt=new long[4];
+ private final long[] windowObservedAt=new long[4];
+ private long windowReminderStartedAt=0,lastWindowReminderAt=0;
+ private int windowReminderCount=0;
+ private static final int WINDOW_REMINDER_NOTIFICATION_ID=6250;
  private static final long REMINDER_INTERVAL_MS=60_000L;
  private static final String[] DOOR_KEYS={"driverDoor","passengerDoor","leftRearDoor","rightRearDoor"};
  private static final String[] WINDOW_KEYS={"diverWindow","passengerWindow","leftRearWindow","rightRearWindow"};
@@ -130,6 +135,7 @@ final class AlertRules {
    for(int i=0;i<WINDOW_KEYS.length;i++){
      Integer v=code(raw,WINDOW_KEYS[i],0,100);
      if(v==null)continue;
+     windowObservedAt[i]=SystemClock.elapsedRealtime();
      int now=v==0?0:1;
      Integer old=update(WINDOW_KEYS[i],now);
      if(old==null||old==now)continue;
@@ -258,6 +264,8 @@ final class AlertRules {
  void onMqttConnected(){
    parkedObservedAt=0;lockObservedAt=0;
    java.util.Arrays.fill(doorObservedAt,0);
+   java.util.Arrays.fill(windowObservedAt,0);
+   windowReminderStartedAt=0;lastWindowReminderAt=0;windowReminderCount=0;
    reminderStartedAt=0;lastReminderAt=0;
    parkKnown=false;lockKnown=false;
  }
@@ -266,6 +274,10 @@ final class AlertRules {
   * First reminder follows one continuous minute of parked + open/unlocked.
   */
  void tickReminder(){
+   tickParkedOpenReminder();
+   tickLockedWindowReminder();
+ }
+ private void tickParkedOpenReminder(){
    if(!enabled(app,PARKED_OPEN_REMINDER)||parkedObservedAt==0||!parked){
      reminderStartedAt=0;lastReminderAt=0;return;
    }
@@ -291,6 +303,43 @@ final class AlertRules {
    notifyUser("Recordatorio: Mazda aparcado sin asegurar",
      reason+". Según la última lectura MQTT; comprueba y asegura el coche.");
    lastReminderAt=now;
+ }
+ /**
+  * Independent of parked/unlocked reminders. Starts when MQTT has actually
+  * observed both a locked vehicle and at least one open window in this session.
+  * No new MQTT message is needed for the periodic interval to elapse.
+  */
+ private void tickLockedWindowReminder(){
+   if(!enabled(app,LOCKED_WINDOW_REMINDER)||!lockKnown||!locked||lockObservedAt==0){
+     resetLockedWindowReminder();return;
+   }
+   java.util.List<String> opened=new java.util.ArrayList<>();
+   for(int i=0;i<WINDOW_KEYS.length;i++){
+     if(windowObservedAt[i]>0&&Integer.valueOf(1).equals(states.get(WINDOW_KEYS[i])))
+       opened.add(POSITIONS[i]);
+   }
+   if(opened.isEmpty()){resetLockedWindowReminder();return;}
+   long now=SystemClock.elapsedRealtime();
+   if(windowReminderStartedAt==0){windowReminderStartedAt=now;return;}
+   if(now-windowReminderStartedAt<REMINDER_INTERVAL_MS||
+      lastWindowReminderAt!=0&&now-lastWindowReminderAt<REMINDER_INTERVAL_MS)return;
+   windowReminderCount++;
+   String which=opened.size()==1?"la ventanilla del "+opened.get(0):
+     opened.size()+" ventanillas ("+String.join(", ",opened)+")";
+   String title="Mazda cerrado con ventanilla abierta";
+   String body="El coche sigue bloqueado, pero tiene abierta "+which+
+     ". Aviso número "+windowReminderCount+". Comprueba la última lectura MQTT y cierra las ventanillas.";
+   // Reuse one notification slot to avoid dozens of identical notifications in
+   // Android's notification shade; the content changes on every reminder.
+   MainActivity.alert(app,title,body,WINDOW_REMINDER_NOTIFICATION_ID);
+   AlertHistory.add(app,title,body);
+   totalAlerts++;
+   lastWindowReminderAt=now;
+ }
+ private void resetLockedWindowReminder(){
+   windowReminderStartedAt=0;
+   lastWindowReminderAt=0;
+   windowReminderCount=0;
  }
  private boolean sentinelArmed(){return enabled(app,SENTINEL)&&lockKnown&&locked&&parkKnown&&parked;}
  int getLockChanges(){return lockChanges;}
