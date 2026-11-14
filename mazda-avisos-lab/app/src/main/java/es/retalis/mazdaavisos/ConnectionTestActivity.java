@@ -28,6 +28,7 @@ import java.security.KeyPairGenerator;
 import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.UUID;
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.crypto.Cipher;
@@ -43,7 +44,7 @@ public class ConnectionTestActivity extends Activity {
  // Clave pública RSA 2048 del servicio de autenticación, publicada por la integración comunitaria.
  static final String SERVER_RSA="MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkyhr43cBPTJ3jLiYsmbUwUp74cMJIOju5vqVzgtuK63Q99qV6iVT8wN5cXlyMtWI2mfOmhIao/fUN821im69MfOHsWXdqQEo5e9v654GPw+bju0pCphEPtD1I0VcyS34QkAu04urSun2U1q3Dr2OICLVWSnLa+01ioKxkaB0D209zXcls2eFQpvRAWm7xxVsoqzSwqp+neu5quOpn+eO/bW0TxcSQ8VZcDEUvadRTLSR0eOWgRuHIBiD2RGqPIPzKCm5A14q1qhxUZ8U0pmYe0Sx7eMy4RVe2iW7fnjc6pxTUMBkercSL26mevYouuCKqyie+LVQAtGa29RMl/lyiwIDAQAB";
  private final ExecutorService executor=Executors.newSingleThreadExecutor();
- private EditText emailField,passwordField,codeField;
+ private EditText emailField,passwordField,codeField,pinField;
  private TextView status;
  private Button loginButton,verifyButton,listenButton,sessionButton;
  private MqttProbe probe;
@@ -51,6 +52,8 @@ public class ConnectionTestActivity extends Activity {
  private String mqttSecret;
  private String token=null,encryptedEmail=null,deviceId=null;
  private java.security.PrivateKey controlKey=null;
+ private char[] pendingPin=null;
+ private void erasePendingPin(){if(pendingPin!=null)Arrays.fill(pendingPin,'\u0000');pendingPin=null;}
  private String previousMessage="";
  @Override public void onCreate(Bundle state){
    super.onCreate(state);
@@ -67,6 +70,11 @@ public class ConnectionTestActivity extends Activity {
    info.setPadding(0,18,0,18);root.addView(info);
    emailField=new EditText(this);emailField.setSingleLine(true);emailField.setHint("Correo cuenta secundaria");emailField.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);root.addView(emailField);
    passwordField=new EditText(this);passwordField.setSingleLine(true);passwordField.setHint("Contraseña de cuenta secundaria");passwordField.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);root.addView(passwordField);
+   pinField=new EditText(this);pinField.setSingleLine(true);
+   pinField.setHint("PIN Mazda de control · 6 cifras");
+   pinField.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+   pinField.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(6)});
+   root.addView(pinField);
    loginButton=new Button(this);loginButton.setText("Conectar cuenta Mazda");root.addView(loginButton);loginButton.setOnClickListener(v->startLogin());
    TextView accountHelp=new TextView(this);
    accountHelp.setText("¿Todavía no tienes cuenta o no recuerdas la contraseña?");
@@ -120,7 +128,12 @@ public class ConnectionTestActivity extends Activity {
  private void startLogin(){
    final String email=emailField.getText().toString().trim();
    final String password=passwordField.getText().toString();
+   String enteredPin=pinField.getText().toString().trim();
    if(email.isEmpty()||password.isEmpty()){say("Introduce el correo y la contraseña de la cuenta secundaria.");return;}
+   if(!enteredPin.matches("[0-9]{6}")){say("Introduce el PIN Mazda de 6 cifras para esta sesión.");return;}
+   erasePendingPin();
+   pendingPin=enteredPin.toCharArray();
+   pinField.setText("");
    // Evitamos dejar el password visible en el formulario tras iniciar la prueba.
    passwordField.setText("");
    busy(true);
@@ -151,7 +164,7 @@ public class ConnectionTestActivity extends Activity {
          say("Inicio de sesión aceptado. Consultando acceso MQTT...");
          checkMqtt();
        }
-     }catch(Exception e){token=null;say("No se pudo completar: "+safeError(e));}
+     }catch(Exception e){token=null;erasePendingPin();say("No se pudo completar: "+safeError(e));}
      finally {busy(false);}
    });
  }
@@ -170,7 +183,7 @@ public class ConnectionTestActivity extends Activity {
       hideVerification();
       say("Dispositivo verificado. Consultando canales MQTT...");
       checkMqtt();
-    }catch(Exception e){say("Verificación fallida: "+safeError(e));}
+    }catch(Exception e){erasePendingPin();say("Verificación fallida: "+safeError(e));}
     finally {busy(false);}
    });
  }
@@ -235,7 +248,16 @@ public class ConnectionTestActivity extends Activity {
      if(carId.isEmpty())throw new Exception("Falta el identificador del vehículo");
      if(controlKey==null||token==null||token.isEmpty())
        throw new Exception("No se pudo completar la sesión de control");
-     ControlSession.set(token,deviceId,carId,controlKey);
+     if(pendingPin==null||pendingPin.length!=6)throw new Exception("PIN no disponible; inicia sesión otra vez");
+     JSONObject verified=post(EU+"/cma-app-car-control/api/security-code/check-code",
+       new JSONObject().put("safeCode",encrypt(
+         KeyFactory.getInstance("RSA").generatePublic(
+           new X509EncodedKeySpec(Base64.decode(SERVER_RSA,Base64.DEFAULT))),new String(pendingPin))),false);
+     JSONObject pinReply=verified.optJSONObject("data");
+     if(pinReply==null||pinReply.optString("rcToken","").isEmpty())
+       throw new Exception("Mazda no ha autorizado el PIN. Revisa las 6 cifras.");
+     ControlSession.set(token,deviceId,carId,controlKey,pendingPin);
+     erasePendingPin();
      sessionCreated=true;controlKey=null;
 
      boolean mqttReady=false;
@@ -287,7 +309,7 @@ public class ConnectionTestActivity extends Activity {
      token=null;encryptedEmail=null;
    }catch(Exception ex){
      token=null;
-     say("La conexión Mazda ha fallado: "+safeError(ex));
+     erasePendingPin();say("La conexión Mazda ha fallado: "+safeError(ex));
      if(sessionCreated&&action!=null&&!action.isEmpty())
        runOnUiThread(()->openRequestedControl(action));
    }
@@ -425,5 +447,5 @@ public class ConnectionTestActivity extends Activity {
    if(m.length()>160)m=m.substring(0,160);
    return m.replaceAll("(?i)bearer\\s+[A-Za-z0-9._\\-]+","[oculto]");
  }
- @Override protected void onDestroy(){if(probe!=null)probe.close();mqttConfig=null;mqttSecret=null;token=null;encryptedEmail=null;controlKey=null;executor.shutdownNow();super.onDestroy();}
+ @Override protected void onDestroy(){erasePendingPin();if(probe!=null)probe.close();mqttConfig=null;mqttSecret=null;token=null;encryptedEmail=null;controlKey=null;executor.shutdownNow();super.onDestroy();}
 }
