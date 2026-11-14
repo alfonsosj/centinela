@@ -99,3 +99,34 @@ correspondencia MQTT comprobada. No se usa Home Assistant.
 Firma release permanente; `versionCode 22` instala sobre las versiones previas
 con la misma firma. El control remoto conserva la confirmación y el PIN por acción
 cuando correspondan.
+
+
+## 1.1.0 — controles rápidos y paneles de clima/batería
+
+- El icono de cierre está **relleno únicamente cuando está desbloqueado**.
+- Ventanas, portón y climatización ejecutan el comando correspondiente al estado
+  reciente al tocar el icono, sin abrir antes el catálogo de controles.
+  La pulsación muestra confirmación y PIN para movimientos que lo requieren.
+  Los datos desconocidos o antiguos obligan a refrescar en lugar de invertir
+  ciegamente el estado.
+- Se comparte la lógica de comandos Mazda de `VehicleControlActivity` en
+  `MazdaRemoteApi`, conservando las mismas rutas, firmas RSA y comprobación
+  posterior; `QuickControl` permite utilizarla desde la portada con consentimiento.
+- Una sesión de control expirada obliga a autenticar la cuenta secundaria;
+  después de iniciar sesión se regresa al comando seleccionado.
+- Pulsar **Temp** abre `ClimateDashboardActivity`: pestañas A/C y Asiento,
+  temperatura interior, humedad, PM2.5 (cuando exista lectura), temperatura
+  objetivo 16–30 °C, climatización, desempañado y accesos a mandos de asientos.
+- Pulsar **Batería** abre `BatteryDashboardActivity`: carga, SOC, autonomía,
+  cable y acceso al ajuste remoto del límite (60–100 %).
+- Los interruptores de carga programada, intervalo de carga y precalentamiento
+  de batería que aparecen en la app oficial siguen **sin activar en esta
+  implementación**: no hay configuración de plan verificada para escribir en
+  Mazda. Se muestran explicaciones en lugar de simulaciones de interruptores.
+- La información faltante se representa como «sin datos» y nunca se inventan
+  humedades, PM2.5 ni estados físicos.
+
+La compilación Android y la firma NO prueban por sí solas el comportamiento
+de los nuevos mandos rápidos; conviene comprobarlos físicamente con el coche
+supervisado. `versionCode=23` permite actualizar la 1.0.0 firmada sin
+desinstalarla.
