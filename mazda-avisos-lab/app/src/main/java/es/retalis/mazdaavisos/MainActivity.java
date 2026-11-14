@@ -226,7 +226,6 @@ public class MainActivity extends Activity {
    }
    divider(quick);
    int events=AlertHistory.read(this).length();
-   int events=AlertHistory.read(this).length();
    TextView info=text("◉  Centinela configurable    ·    "+events+" avisos guardados",13,INK,true);
    quick.addView(info);
    button(quick,"Personalizar avisos y Centinela",()->startActivity(new Intent(this,AlertSettingsActivity.class)),false);
