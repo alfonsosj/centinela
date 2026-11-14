@@ -28,13 +28,19 @@ public final class VehicleControlActivity extends Activity {
  static final String LOCK="lock",UNLOCK="unlock",
    WINDOWS_OPEN="windows_open",WINDOWS_CLOSE="windows_close",
    TRUNK_OPEN="trunk_open",TRUNK_CLOSE="trunk_close",
-   CLIMATE_ON="climate_on",CLIMATE_OFF="climate_off";
+   CLIMATE_ON="climate_on",CLIMATE_OFF="climate_off",
+   FIND="find_vehicle",HORN="honk_horn",
+   DEFROST_ON="defrost_on",DEFROST_OFF="defrost_off",
+   WHEEL_ON="wheel_on",WHEEL_OFF="wheel_off",
+   CHARGE_LIMIT="charge_limit",
+   DRIVER_HEAT="driver_heat",PASSENGER_HEAT="passenger_heat",
+   DRIVER_VENT="driver_vent",PASSENGER_VENT="passenger_vent";
  private static final String ROOT="https://cma-m.iov.changanauto.com.de/cma-app-gw";
  private final ExecutorService worker=Executors.newSingleThreadExecutor();
  private TextView state;
  private EditText pinInput;
  private android.widget.SeekBar climateTarget;
- private int temperature=21;
+ private int temperature=21,chargeTarget=80,seatLevel=0;
  private Button sendButton;
  private String action;
  private volatile boolean busy=false;
@@ -56,7 +62,12 @@ public final class VehicleControlActivity extends Activity {
      TRUNK_OPEN.equals(action)||TRUNK_CLOSE.equals(action);
  }
  private static boolean knownAction(String action){
-   return protectedAction(action)||CLIMATE_ON.equals(action)||CLIMATE_OFF.equals(action);
+   return protectedAction(action)||CLIMATE_ON.equals(action)||CLIMATE_OFF.equals(action)||
+     FIND.equals(action)||HORN.equals(action)||
+     DEFROST_ON.equals(action)||DEFROST_OFF.equals(action)||
+     WHEEL_ON.equals(action)||WHEEL_OFF.equals(action)||CHARGE_LIMIT.equals(action)||
+     DRIVER_HEAT.equals(action)||PASSENGER_HEAT.equals(action)||
+     DRIVER_VENT.equals(action)||PASSENGER_VENT.equals(action);
  }
  private static String actionName(String action){
    switch(action){
@@ -68,6 +79,17 @@ public final class VehicleControlActivity extends Activity {
      case TRUNK_CLOSE: return "Cerrar maletero";
      case CLIMATE_ON: return "Activar climatización";
      case CLIMATE_OFF: return "Apagar climatización";
+     case FIND: return "Localizar coche";
+     case HORN: return "Sonar bocina";
+     case DEFROST_ON: return "Activar desempañado";
+     case DEFROST_OFF: return "Desactivar desempañado";
+     case WHEEL_ON: return "Activar calefacción del volante";
+     case WHEEL_OFF: return "Desactivar calefacción del volante";
+     case CHARGE_LIMIT: return "Ajustar límite de carga";
+     case DRIVER_HEAT: return "Calefacción asiento conductor";
+     case PASSENGER_HEAT: return "Calefacción asiento acompañante";
+     case DRIVER_VENT: return "Ventilación asiento conductor";
+     case PASSENGER_VENT: return "Ventilación asiento acompañante";
      default: return "Acción no reconocida";
    }
  }
@@ -85,7 +107,7 @@ public final class VehicleControlActivity extends Activity {
    card.addView(text(actionName(action),20,true));
    TextView instruction=text(needsPin?
      "Introduce el PIN de control Mazda de 6 cifras. Se utiliza solo para autorizar esta orden y nunca se almacena.":
-     "La climatización utiliza una orden firmada de Mazda. No requiere el PIN, pero siempre pedirá confirmación.",14,false);
+     "Esta orden utiliza una solicitud firmada a Mazda Europa. Las funciones nuevas son experimentales y requieren confirmación.",14,false);
    instruction.setPadding(0,dp(14),0,dp(12));card.addView(instruction);
    state=text("Sin enviar órdenes al vehículo.",13,false);card.addView(state);
    ControlSession.State s=ControlSession.get();
@@ -119,6 +141,28 @@ public final class VehicleControlActivity extends Activity {
        });
        card.addView(climateTarget);
      }
+     if(CHARGE_LIMIT.equals(action)){
+       TextView label=text("Límite de carga: 80 %",15,true);card.addView(label);
+       SeekBar slider=new SeekBar(this);slider.setMax(40);slider.setProgress(20);
+       slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+         public void onProgressChanged(SeekBar b,int v,boolean user){
+           chargeTarget=60+v;label.setText("Límite de carga: "+chargeTarget+" %");
+         }
+         public void onStartTrackingTouch(SeekBar b){}
+         public void onStopTrackingTouch(SeekBar b){}
+       });card.addView(slider);
+     }
+     if(action.startsWith("driver_")||action.startsWith("passenger_")){
+       TextView label=text("Nivel: apagado",15,true);card.addView(label);
+       SeekBar slider=new SeekBar(this);slider.setMax(3);
+       slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+         public void onProgressChanged(SeekBar b,int v,boolean user){
+           seatLevel=v;label.setText("Nivel: "+(v==0?"apagado":v+" de 3"));
+         }
+         public void onStartTrackingTouch(SeekBar b){}
+         public void onStopTrackingTouch(SeekBar b){}
+       });card.addView(slider);
+     }
      sendButton=new Button(this);
      sendButton.setText("Solicitar: "+actionName(action));
      card.addView(sendButton);
@@ -139,12 +183,15 @@ public final class VehicleControlActivity extends Activity {
    if(session==null){say("La sesión de control ha caducado. Inicia sesión otra vez.");return;}
    boolean unlock=UNLOCK.equals(action);
    boolean isDoors=LOCK.equals(action)||UNLOCK.equals(action);
+   final int temp=temperature,limit=chargeTarget,level=seatLevel;
    String safety=action.equals(WINDOWS_OPEN)||action.equals(WINDOWS_CLOSE)||
        action.equals(TRUNK_OPEN)||action.equals(TRUNK_CLOSE)?
      "Asegúrate de que no hay personas, animales ni obstáculos cerca de las ventanillas o el portón. Esta orden puede mover elementos físicos y generar riesgos.":
      unlock?"Desbloqueará el vehículo. Confirma que estás en un lugar seguro.":
      LOCK.equals(action)?"Comprueba que nadie necesite salir del coche.":
-     "La climatización puede consumir batería. Comprueba que el vehículo está aparcado.";
+     FIND.equals(action)||HORN.equals(action)?"La bocina y/o las luces podrían activarse. Úsalo solo cuando sea apropiado.":
+     CHARGE_LIMIT.equals(action)?"Se cambiará el límite de carga, sin iniciar ni detener la carga.":
+     "Comprueba que el coche esté aparcado y que nadie pueda verse afectado por la activación de sistemas eléctricos.";
    new AlertDialog.Builder(this)
      .setTitle("¿"+actionName(action)+"?")
      .setMessage(safety+" Esta operación requiere tu confirmación explícita.")
@@ -153,7 +200,7 @@ public final class VehicleControlActivity extends Activity {
        busy=true;sendButton.setEnabled(false);
        say("Autorizando con Mazda…");
        worker.execute(()->{
-         try{DoorResult res=execute(session,pin,unlock);
+         try{DoorResult res=isDoors?execute(session,pin,unlock):executeAdvanced(session,pin,action,temp,limit,level);
            say(res.message);
          }catch(Exception e){say("No se ha podido confirmar la orden: "+safeError(e));}
          finally{runOnUiThread(()->{busy=false;if(sendButton!=null)sendButton.setEnabled(true);});}
