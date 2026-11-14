@@ -78,18 +78,6 @@ public class MainActivity extends Activity {
    LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,0,1);np.topMargin=dp(7);tile.addView(number,np);
    label(tile,foot,12,MUTED,false);
  }
- private void remoteButton(LinearLayout row,String label,String glyph,String action){
-   LinearLayout wrapper=vertical();
-   wrapper.setGravity(Gravity.CENTER);
-   wrapper.setPadding(dp(8),dp(12),dp(8),dp(12));
-   wrapper.setBackground(bg(BG,20));
-   row.addView(wrapper,new LinearLayout.LayoutParams(0,-2,1));
-   TextView icon=text(glyph,28,INK,false);icon.setGravity(Gravity.CENTER);wrapper.addView(icon);
-   TextView title=text(label,13,INK,true);title.setGravity(Gravity.CENTER);wrapper.addView(title);
-   wrapper.setContentDescription(label+" puertas del vehículo");
-   wrapper.setOnClickListener(v->startActivity(new Intent(this,VehicleControlActivity.class)
-     .putExtra(VehicleControlActivity.EXTRA_ACTION,action)));
- }
  private void remote(String action){
    startActivity(new Intent(this,VehicleControlActivity.class)
      .putExtra(VehicleControlActivity.EXTRA_ACTION,action));
@@ -200,7 +188,6 @@ public class MainActivity extends Activity {
    label(quick,"Ventanas y maletero",15,INK,true);
    TextView trunkInfo=text("Maletero: "+car.trunkText()+"   ·   Ventanas: "+car.windowText(),13,MUTED,false);
    quick.addView(trunkInfo);
-   label(quick,"Ventanillas: "+car.windowText()+". Maletero: "+car.trunkText()+".",12,MUTED,false);
    TextView safetyInfo=text("La app puede consultar y avisar de cambios, pero las órdenes de ventanillas y maletero aún no están verificadas para el CX-6e europeo. Por seguridad no se ofrecen botones de movimiento.",12,MUTED,false);
    LinearLayout.LayoutParams safetyParams=new LinearLayout.LayoutParams(-1,-2);
    safetyParams.topMargin=dp(8);quick.addView(safetyInfo,safetyParams);
