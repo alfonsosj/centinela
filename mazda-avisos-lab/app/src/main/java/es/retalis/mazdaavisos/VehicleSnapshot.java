@@ -45,6 +45,7 @@ final class VehicleSnapshot {
  }
  static void observe(Context context,JSONObject raw){
    if(raw==null||raw.length()==0)return;
+   FeatureEvidence.observe("MQTT estados",raw);
    SharedPreferences p=context.getSharedPreferences(PREF,Context.MODE_PRIVATE);
    SharedPreferences.Editor e=p.edit();
    boolean fresh=false;
@@ -105,6 +106,7 @@ final class VehicleSnapshot {
  /** Initial authoritative status snapshot from Mazda's EU HTTPS vehicle API. */
  static boolean observeApi(Context context,JSONObject data){
    if(data==null)return false;
+   FeatureEvidence.observe("HTTPS Europa",data);
    SharedPreferences prefs=context.getSharedPreferences(PREF,Context.MODE_PRIVATE);
    SharedPreferences.Editor edit=prefs.edit();
    boolean updated=false;

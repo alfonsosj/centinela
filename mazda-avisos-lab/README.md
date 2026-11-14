@@ -1,5 +1,13 @@
 # Mazda Avisos Lab
 
+## 1.1.11 — Investigación de funciones chinas
+
+- La lectura europea añade metadatos de `commandCode` y marcas de disponibilidad sin interpretar un código como prueba de ejecución.
+- Inventario acotado en memoria de nombres de campos HTTPS/MQTT y valores numéricos de estados de Centinela, cámaras y APA. No almacena mensajes completos, credenciales, VIN ni ubicaciones. Se reinicia al autenticar una sesión.
+- Prueba regional opcional de lectura de configuración. Solo tras aceptar el diálogo específico puede enviar el token temporal europeo y el identificador del coche a la ruta china ya identificada, con el canal `chang-ma`. Prueba como máximo el token completo y su tramo TSP; no envía contraseña, PIN ni órdenes, ni migra la vinculación.
+- Los cuatro resultados se reúnen en «Copiar informe completo».
+- `versionCode 34`, firma estable para instalar sobre la versión anterior.
+
 ## 1.1.10 — Diagnóstico de funciones China / Europa
 
 - Acceso en Conexión y herramientas para consultar la configuración de funciones del propio coche en Europa y buscar indicios de Centinela, fotografía interior/exterior, DVR y aparcamiento remoto.

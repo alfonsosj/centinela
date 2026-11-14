@@ -257,6 +257,7 @@ public class ConnectionTestActivity extends SafeAreaActivity {
      if(pinReply==null||pinReply.optString("rcToken","").isEmpty())
        throw new Exception("Mazda no ha autorizado el PIN. Revisa las 6 cifras.");
      ControlSession.set(token,deviceId,carId,controlKey,pendingPin);
+     FeatureEvidence.reset();
      erasePendingPin();
      sessionCreated=true;controlKey=null;
 

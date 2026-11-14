@@ -150,6 +150,7 @@ final class MqttProbe {
    if(m.retained)return;
    if(m.topic.endsWith("/events/up")){
      events++;
+     FeatureEvidence.observe("MQTT eventos",values(m.json));
      if(!warnedEvent){warnedEvent=true;
        MainActivity.alert(app,"Evento MQTT Mazda (sin clasificar)","El servidor ha emitido un evento. Todavía no sabemos si corresponde a un aviso del Centro de Mensajes.",2401);
      }
