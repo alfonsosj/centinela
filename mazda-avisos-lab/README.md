@@ -1,5 +1,13 @@
 # Mazda Avisos Lab
 
+## 1.1.10 — Diagnóstico de funciones China / Europa
+
+- Acceso en Conexión y herramientas para consultar la configuración de funciones del propio coche en Europa y buscar indicios de Centinela, fotografía interior/exterior, DVR y aparcamiento remoto.
+- Prueba anónima de la pasarela china: no envía cuenta, PIN, VIN ni token europeo. No equivale a autenticar una cuenta europea en China.
+- Las dos consultas tienen destinos fijos, límites de respuesta y no contienen rutas de control. El informe muestra solo códigos funcionales y omite identificadores y credenciales.
+- El análisis estático del APK oficial chino v1.0.72 confirma módulos de Centinela, fotografías y aparcamiento. Esto no acredita que un CX-6e europeo admita esas funciones. Véase `docs/CHINA_RESEARCH_2026-11-14.md`.
+- `versionCode 33`, misma firma de actualización.
+
 ## 1.1.9 — Icono Mazda con antenas y ojos
 
 - Icono de aplicación aprobado por el usuario: emblema negro de Mazda con antenas y ojos, sobre fondo blanco, conservando el archivo original sin redibujarlo.

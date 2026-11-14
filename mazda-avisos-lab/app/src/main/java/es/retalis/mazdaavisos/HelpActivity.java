@@ -160,6 +160,8 @@ public final class HelpActivity extends SafeAreaActivity {
      Una orden se rechaza o queda sin confirmar: comprueba la sesión, el estado reciente del coche, que esté aparcado cuando corresponda y que admita la función. Verifica físicamente el resultado antes de repetir una orden.
 
      El Centro de Mensajes no funciona: comprueba la app europea y la accesibilidad, y abre el centro manualmente. «Copiar diagnóstico», en las herramientas, copia información técnica al portapapeles para revisarla; úsalo solo si necesitas analizar un problema.
+
+     Para investigar funciones de la versión china, abre «Conexión y herramientas» > «Diagnóstico China / Europa». Autentica la cuenta y pulsa «Leer funciones declaradas de mi coche». El resultado busca menciones de Centinela, cámaras, DVR y aparcamiento en la configuración europea. Una mención no confirma que la función se pueda activar. La segunda prueba comprueba la respuesta del servidor chino sin enviar credenciales europeas ni identificar el coche. Ninguna de las dos envía órdenes al vehículo.
      """},
    {"17. Privacidad y límites de la app", """
      La app conserva localmente ajustes, últimas lecturas, historial y algunos diagnósticos. La contraseña, el PIN y los datos de la sesión de control no se guardan como credenciales persistentes. La autenticación y los controles se comunican con los servicios de Mazda mediante conexiones cifradas.
