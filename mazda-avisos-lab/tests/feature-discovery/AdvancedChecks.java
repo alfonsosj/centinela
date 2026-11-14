@@ -19,7 +19,7 @@ public final class AdvancedChecks {
   public OutputStream getOutputStream()throws IOException{if(failTls)throw new SSLException("PRIVATE-TLS-DATA");return sent;}
   public int getResponseCode(){return 200;}
   public InputStream getInputStream(){
-   JSONObject reply=new JSONObject().put("code",index%2==0?"AUTH_INVALID":"000000").put("success",index%2!=0);
+   JSONObject reply=new JSONObject().put("code",index%2==0?"PRIVATE-TSP-TOKEN":"000000").put("success",index%2!=0);
    if(index%2!=0)reply.put("data",new JSONObject().put("token","PRIVATE-TSP-TOKEN").put("vin","PRIVATE-CAR-007")
     .put("items",new JSONArray().put(new JSONObject().put("applicationFuncCode","#sentryMode")
     .put("commandCode","setSentryMode").put("enabled",false))));

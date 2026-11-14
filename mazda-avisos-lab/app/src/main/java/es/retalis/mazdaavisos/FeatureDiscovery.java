@@ -39,7 +39,7 @@ final class FeatureDiscovery {
  private static String normalized(String value){return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]","");}
  private void code(String value){
    // Codes describe functions, never accounts, topics, identifiers or tokens.
-   if(value==null||!value.matches("[#A-Za-z][A-Za-z0-9_#./:-]{0,95}"))return;
+   if(symbolic(value)==null)return;
    if(codes.size()<160)codes.add(value);else limited=true;
    marker(value);
  }
@@ -130,7 +130,7 @@ final class FeatureDiscovery {
    JSONObject response=request(EUROPE,new JSONObject().put("carId",session.vehicleId),session);
    if(!response.optBoolean("success",false))throw new IOException("Europa rechazó la lectura ("+safeCode(response)+").");
    if(!response.has("data")||response.isNull("data"))throw new IOException("Europa respondió sin configuración de funciones. No se puede concluir compatibilidad.");
-   return analyze(response.opt("data"));
+   return redactSession(analyze(response.opt("data")),session);
  }
  static String china()throws Exception{
    // Deliberately anonymous: different authentication, no token or car identifier.
@@ -173,7 +173,12 @@ final class FeatureDiscovery {
    }
    out.append("\nDatos autorizados para esta prueba: token temporal e identificador del coche, con un máximo de dos formatos de token. No se envían contraseña ni PIN. No modifica la región, la vinculación del vehículo ni sus ajustes y no envía órdenes.\n");
    out.append("El informe no contiene el token, el identificador del coche ni el texto completo de las respuestas.\n");
-   return out.toString();
+   return redactSession(out.toString(),session);
+ }
+ private static String redactSession(String report,ControlSession.State session){
+   for(String value:new String[]{session.token,session.token.substring(session.token.lastIndexOf('|')+1),session.vehicleId,session.deviceId})
+     if(value!=null&&!value.isEmpty())report=report.replace(value,"[omitido]");
+   return report;
  }
  private static final class GatewayException extends IOException{
    GatewayException(int status){super("La pasarela respondió HTTP "+status+". No se ha verificado compatibilidad.");}
