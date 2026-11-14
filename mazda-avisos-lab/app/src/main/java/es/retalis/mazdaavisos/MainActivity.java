@@ -148,9 +148,13 @@ public class MainActivity extends Activity {
    top.addView(status);hero.addView(top);
    TextView freshness=text(car.age()+(car.stale()&&car.lastDataAt>0?" · verificar actualización":""),12,car.stale()?MUTED:GREEN,false);
    LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-1,-2);fp.topMargin=dp(7);hero.addView(freshness,fp);
-   VehicleSketchView sketch=new VehicleSketchView(this);
+   ImageView vehicleImage=new ImageView(this);
+   vehicleImage.setImageResource(R.drawable.cx6e_aerogrey);
+   vehicleImage.setContentDescription("Ilustración de Mazda CX-6e europeo Aero Grey");
+   vehicleImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+   vehicleImage.setAdjustViewBounds(true);
    LinearLayout.LayoutParams drawing=new LinearLayout.LayoutParams(-1,dp(156));
-   drawing.topMargin=dp(5);hero.addView(sketch,drawing);
+   drawing.topMargin=dp(5);hero.addView(vehicleImage,drawing);
    LinearLayout bottom=horizontal();
    TextView carInfo=text(car.locationText()+"  ·  "+car.doorText(),13,INK,true);
    bottom.addView(carInfo,new LinearLayout.LayoutParams(0,-2,1));
