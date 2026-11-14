@@ -21,6 +21,7 @@ import org.json.JSONObject;
  */
 public final class MainActivity extends Activity {
  static final String CHANNEL="mazda_lab_alerts";
+ static final String EXTRA_INLINE_LOGIN="quick_control_after_login",EXTRA_QUICK_ACTION="quick_control_action";
  private static final int INK=0xFF263548, MUTED=0xFF89909B, BG=0xFFF4F5FB, WHITE=Color.WHITE;
  private static final int LILAC=0xFF8B8CEB, GREEN=0xFF1BA67F, BORDER=0xFFE8EAF1;
  private LinearLayout root;
@@ -77,7 +78,14 @@ public final class MainActivity extends Activity {
      .setContentIntent(open).setAutoCancel(true).build();
    manager.notify(id,n);
  }
- @Override public void onCreate(Bundle b){super.onCreate(b);render();}
+ @Override public void onCreate(Bundle b){
+   super.onCreate(b);render();
+   String pending=getIntent().getStringExtra(EXTRA_QUICK_ACTION);
+   if(pending!=null&&!pending.isEmpty()){
+     getIntent().removeExtra(EXTRA_QUICK_ACTION);
+     getWindow().getDecorView().post(()->QuickControl.invoke(this,pending));
+   }
+ }
  @Override protected void onResume(){super.onResume();render();}
  private void remote(String action){
    startActivity(new Intent(this,VehicleControlActivity.class).putExtra(VehicleControlActivity.EXTRA_ACTION,action));
@@ -248,33 +256,69 @@ public final class MainActivity extends Activity {
    LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.topMargin=dp(5);bp.bottomMargin=dp(19);
    root.addView(buttons,bp);
    boolean recentLock=v.lock>=0&&v.freshForControl();
-   int lockStatus=recentLock?(v.lock==0?1:0):-1;
+   int lockStatus=recentLock?(v.lock==1?1:0):-1;
    controlCircle(buttons,"Cierre",VehicleStateIconView.LOCK,lockStatus,()->{
      VehicleSnapshot now=VehicleSnapshot.read(this);
      if(now.lock<0||!now.freshForControl()){
        new AlertDialog.Builder(this).setTitle("Actualización necesaria")
          .setMessage("La última lectura del cierre no es suficientemente reciente. Consulta Mazda antes de enviar una orden.")
-         .setPositiveButton("Actualizar", (dialog,which)->remote(VehicleControlActivity.REFRESH))
+         .setPositiveButton("Actualizar", (dialog,which)->QuickControl.invoke(this,VehicleControlActivity.REFRESH))
          .setNegativeButton("Cancelar",null).show();
        return;
      }
-     remote(now.lock==0?VehicleControlActivity.UNLOCK:VehicleControlActivity.LOCK);
+     QuickControl.invoke(this,now.lock==0?VehicleControlActivity.UNLOCK:VehicleControlActivity.LOCK);
    });
    int windowsStatus=v.windowsKnown<4||v.stale()?-1:v.windowsOpen>0?1:0;
-   controlCircle(buttons,"Ventanas",VehicleStateIconView.WINDOWS,windowsStatus,
-     ()->startActivity(new Intent(this,ControlsActivity.class)));
+   controlCircle(buttons,"Ventanas",VehicleStateIconView.WINDOWS,windowsStatus,()->{
+     VehicleSnapshot current=VehicleSnapshot.read(this);
+     if(current.stale()||current.windowsKnown!=4){
+       new AlertDialog.Builder(this).setTitle("Estado de ventanillas desconocido")
+         .setMessage("Actualiza la lectura Mazda antes de abrir o cerrar las cuatro ventanillas.")
+         .setPositiveButton("Actualizar",(d,w)->QuickControl.invoke(this,VehicleControlActivity.REFRESH))
+         .setNegativeButton("Cancelar",null).show();return;
+     }
+     QuickControl.invoke(this,current.windowsOpen>0?
+       VehicleControlActivity.WINDOWS_CLOSE:VehicleControlActivity.WINDOWS_OPEN);
+   });
    int trunkStatus=v.trunk<0||v.stale()?-1:v.trunk==1?1:0;
-   controlCircle(buttons,"Maletero",VehicleStateIconView.TRUNK,trunkStatus,
-     ()->startActivity(new Intent(this,ControlsActivity.class)));
+   controlCircle(buttons,"Maletero",VehicleStateIconView.TRUNK,trunkStatus,()->{
+     VehicleSnapshot current=VehicleSnapshot.read(this);
+     if(current.stale()||current.trunk<0){
+       new AlertDialog.Builder(this).setTitle("Estado del maletero desconocido")
+         .setMessage("Actualiza el vehículo antes de mover el maletero.")
+         .setPositiveButton("Actualizar",(d,w)->QuickControl.invoke(this,VehicleControlActivity.REFRESH))
+         .setNegativeButton("Cancelar",null).show();return;
+     }
+     QuickControl.invoke(this,current.trunk==1?
+       VehicleControlActivity.TRUNK_CLOSE:VehicleControlActivity.TRUNK_OPEN);
+   });
    int climateStatus=v.climate<0||v.stale()?-1:v.climate==1?1:0;
-   controlCircle(buttons,"Clima",VehicleStateIconView.CLIMATE,climateStatus,
-     ()->startActivity(new Intent(this,ControlsActivity.class)));
+   controlCircle(buttons,"Clima",VehicleStateIconView.CLIMATE,climateStatus,()->{
+     VehicleSnapshot current=VehicleSnapshot.read(this);
+     if(current.stale()||current.climate<0){
+       new AlertDialog.Builder(this).setTitle("Climatización sin estado actual")
+         .setMessage("Actualiza el vehículo antes de activar o desactivar el clima.")
+         .setPositiveButton("Actualizar",(d,w)->QuickControl.invoke(this,VehicleControlActivity.REFRESH))
+         .setNegativeButton("Cancelar",null).show();return;
+     }
+     QuickControl.invoke(this,current.climate==1?
+       VehicleControlActivity.CLIMATE_OFF:VehicleControlActivity.CLIMATE_ON,
+       current.remoteTemp==null?24:(int)Math.round(current.remoteTemp));
+   });
 
    LinearLayout metrics=horizontal();
    LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(-1,-2);mp.bottomMargin=dp(14);root.addView(metrics,mp);
    pairMetric(metrics,"Temp","Dentro",v.tempText(),"Interior · °C");
+   View temperatureCard=metrics.getChildAt(metrics.getChildCount()-1);
+   temperatureCard.setOnClickListener(view->startActivity(
+     new Intent(this,ClimateDashboardActivity.class)));
+   temperatureCard.setContentDescription("Abrir detalles de climatización");
    metrics.addView(new View(this),new LinearLayout.LayoutParams(dp(12),dp(1)));
    pairMetric(metrics,"Batería",v.chargeText(),v.socText(),v.rangeText());
+   View batteryCard=metrics.getChildAt(metrics.getChildCount()-1);
+   batteryCard.setOnClickListener(view->startActivity(
+     new Intent(this,BatteryDashboardActivity.class)));
+   batteryCard.setContentDescription("Abrir detalles de batería y carga");
 
    LinearLayout statusCard=card();
    label(statusCard,"Estado del vehículo",17,INK,true);
@@ -355,7 +399,7 @@ public final class MainActivity extends Activity {
      android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
      if(clipboard!=null)clipboard.setPrimaryClip(ClipData.newPlainText("Diagnóstico Mazda",Data.technicalDiagnostic(this)));
    });
-   TextView disclaimer=text("Mazda Avisos 1.0 RC2 · Datos y alertas sujetos a conexión. Los controles adicionales no están validados en este vehículo. No sustituye el sistema oficial ni una alarma.",11,MUTED,false);
+   TextView disclaimer=text("Mazda Avisos 1.1 · Datos y alertas sujetos a conexión. Los controles adicionales no están validados en este vehículo. No sustituye el sistema oficial ni una alarma.",11,MUTED,false);
    disclaimer.setPadding(0,dp(4),0,dp(6));root.addView(disclaimer);
  }
  @Override public void onRequestPermissionsResult(int code,String[] perms,int[] results){
