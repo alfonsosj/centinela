@@ -53,7 +53,7 @@ public class ConnectionTestActivity extends Activity {
  private String token=null,encryptedEmail=null,deviceId=null;
  private java.security.PrivateKey controlKey=null;
  private char[] pendingPin=null;
- private void erasePendingPin(){if(pendingPin!=null)Arrays.fill(pendingPin,'\u0000');pendingPin=null;}
+ private void erasePendingPin(){if(pendingPin!=null)Arrays.fill(pendingPin,(char)0);pendingPin=null;}
  private String previousMessage="";
  @Override public void onCreate(Bundle state){
    super.onCreate(state);
