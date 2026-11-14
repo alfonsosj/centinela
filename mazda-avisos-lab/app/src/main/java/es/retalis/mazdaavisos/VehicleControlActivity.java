@@ -38,7 +38,6 @@ public final class VehicleControlActivity extends Activity {
  private static final String ROOT="https://cma-m.iov.changanauto.com.de/cma-app-gw";
  private final ExecutorService worker=Executors.newSingleThreadExecutor();
  private TextView state;
- private EditText pinInput;
  private android.widget.SeekBar climateTarget;
  private int temperature=21,chargeTarget=80,seatLevel=0;
  private Button sendButton;
@@ -109,7 +108,7 @@ public final class VehicleControlActivity extends Activity {
    card.addView(text(actionName(action),20,true));
    TextView instruction=text(REFRESH.equals(action)?
      "Consulta de solo lectura. No se envía ninguna orden al coche.":
-     needsPin?"Introduce el PIN Mazda de 6 cifras. No se almacena.":
+     needsPin?"PIN verificado al autenticar la cuenta; no es necesario introducirlo otra vez.":
      "Orden de Mazda Europa firmada y confirmada. Algunas funciones dependen del equipamiento y aún no se han comprobado físicamente.",14,false);
    instruction.setPadding(0,dp(14),0,dp(12));card.addView(instruction);
    state=text(REFRESH.equals(action)?"Sin consultar todavía.":"Sin enviar órdenes al vehículo.",13,false);card.addView(state);
@@ -125,13 +124,6 @@ public final class VehicleControlActivity extends Activity {
        startActivity(i);finish();
      });
    } else {
-     if(needsPin){
-       pinInput=new EditText(this);
-       pinInput.setHint("PIN Mazda · 6 cifras");
-       pinInput.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-       pinInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(6)});
-       card.addView(pinInput);
-     }
      if(CLIMATE_ON.equals(action)){
        TextView target=text("Temperatura objetivo: 21 °C",15,true);
        card.addView(target);
@@ -210,9 +202,9 @@ public final class VehicleControlActivity extends Activity {
  private void confirm(){
    if(busy)return;
    boolean needsPin=protectedAction(action);
-   String pin=needsPin&&pinInput!=null?pinInput.getText().toString():"";
-   if(pinInput!=null)pinInput.setText("");
-   if(needsPin&&!pin.matches("[0-9]{6}")){say("El PIN debe tener exactamente 6 cifras.");return;}
+   ControlSession.State active=ControlSession.get();
+   String pin=needsPin?ControlSession.pinFor(active):"";
+   if(needsPin&&pin==null){say("La sesión de control ha caducado. Autentica Mazda otra vez.");return;}
    boolean movesHardware=WINDOWS_OPEN.equals(action)||WINDOWS_CLOSE.equals(action)||
      TRUNK_OPEN.equals(action)||TRUNK_CLOSE.equals(action);
    if(movesHardware){
