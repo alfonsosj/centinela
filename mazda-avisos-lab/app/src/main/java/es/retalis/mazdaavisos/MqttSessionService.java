@@ -163,6 +163,7 @@ public final class MqttSessionService extends Service {
  @Override public int onStartCommand(Intent intent,int flags,int startId){
    String action=intent==null?null:intent.getAction();
    if(ACTION_STOP.equals(action)){
+      ControlSession.clear();
      getSharedPreferences(PREF,MODE_PRIVATE).edit().putBoolean("wants_monitor",false).apply();
      shutdown("Monitor detenido por el usuario.");return START_NOT_STICKY;
    }
