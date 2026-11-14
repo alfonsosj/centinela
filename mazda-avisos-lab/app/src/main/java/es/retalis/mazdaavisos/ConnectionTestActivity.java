@@ -279,6 +279,12 @@ public class ConnectionTestActivity extends Activity {
        checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
      say("Falta permiso de notificaciones para activar el monitor.");return false;
    }
+   // Si ya hay una sesión MQTT activa, no crear otra: se conserva el monitor.
+   if(MqttSessionService.currentStatus(this).startsWith("MQTT conectado")){
+     mqttConfig=null;mqttSecret=null;token=null;encryptedEmail=null;
+     say("Cuenta Mazda conectada. El monitor MQTT ya está activo; se mantiene la escucha.");
+     return true;
+   }
    Intent intent=new Intent(this,MqttSessionService.class).setAction(MqttSessionService.ACTION_START);
    intent.putExtra(MqttSessionService.EXTRA_CONFIG,mqttConfig.toString());
    intent.putExtra(MqttSessionService.EXTRA_AUTH,mqttSecret);
