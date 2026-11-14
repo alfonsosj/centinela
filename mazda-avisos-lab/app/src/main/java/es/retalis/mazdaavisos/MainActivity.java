@@ -9,6 +9,8 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.*;
 import android.widget.*;
@@ -26,6 +28,44 @@ public final class MainActivity extends Activity {
  private static final int LILAC=0xFF8B8CEB, GREEN=0xFF1BA67F, BORDER=0xFFE8EAF1;
  private LinearLayout root;
  private boolean toolsOpen=false;
+ // A foreground MQTT service updates its own state asynchronously. Without
+ // observing it, the first screen paint can remain stuck on "Sin conexión".
+ private final Handler uiHandler=new Handler(Looper.getMainLooper());
+ private boolean watchingStatus=false;
+ private TextView liveIndicator,monitorConnectionText,monitorCounterText;
+ private View stopMonitorControl;
+ private final Runnable connectionWatcher=new Runnable(){
+   @Override public void run(){
+     if(!watchingStatus)return;
+     updateConnectionUi();
+     uiHandler.postDelayed(this,3000L);
+   }
+ };
+ private static boolean mqttConnected(String status){return status.startsWith("MQTT conectado");}
+ private static boolean mqttRetrying(String status){
+   return status.startsWith("Reconectando")||status.startsWith("SIN CONFIRMACIÓN");
+ }
+ private void updateConnectionUi(){
+   String current=MqttSessionService.currentStatus(this);
+   boolean connected=mqttConnected(current),retrying=mqttRetrying(current);
+   if(liveIndicator!=null){
+     liveIndicator.setText(connected?" ●  En línea":retrying?" ◌  Reconectando":" ○  Monitor parado");
+     liveIndicator.setTextColor(connected?GREEN:retrying?0xFFC28A34:MUTED);
+   }
+   if(monitorConnectionText!=null){
+     String description=connected?
+       "MQTT conectado. El monitor recibe actualizaciones del coche.":
+       retrying?"El monitor está intentando recuperar la conexión MQTT.":
+       "MQTT no activo. El control remoto Mazda y el monitor son conexiones independientes.";
+     monitorConnectionText.setText(description);
+   }
+   if(monitorCounterText!=null){
+     monitorCounterText.setText(connected?"Monitor: conectado":retrying?
+       "Monitor: reconectando":"Monitor: detenido");
+   }
+   if(stopMonitorControl!=null)stopMonitorControl.setVisibility(
+     connected||retrying?View.VISIBLE:View.GONE);
+ }
  private int dp(float v){return (int)(v*getResources().getDisplayMetrics().density+.5f);}
  private GradientDrawable surface(int color,int radius){
    GradientDrawable d=new GradientDrawable();
@@ -86,7 +126,15 @@ public final class MainActivity extends Activity {
      getWindow().getDecorView().post(()->QuickControl.invoke(this,pending));
    }
  }
- @Override protected void onResume(){super.onResume();render();}
+ @Override protected void onResume(){
+   super.onResume();render();
+   watchingStatus=true;uiHandler.removeCallbacks(connectionWatcher);
+   uiHandler.post(connectionWatcher);
+ }
+ @Override protected void onPause(){
+   watchingStatus=false;uiHandler.removeCallbacks(connectionWatcher);
+   super.onPause();
+ }
  private void remote(String action){
    startActivity(new Intent(this,VehicleControlActivity.class).putExtra(VehicleControlActivity.EXTRA_ACTION,action));
  }
@@ -215,8 +263,8 @@ public final class MainActivity extends Activity {
    root=vertical();root.setPadding(dp(18),dp(20),dp(18),dp(30));scroll.addView(root);setContentView(scroll);
    VehicleSnapshot v=VehicleSnapshot.read(this);
    String state=MqttSessionService.currentStatus(this);
-   boolean connected=state.startsWith("MQTT conectado");
-   boolean reconnecting=state.startsWith("Reconectando")||state.startsWith("SIN CONFIRMACIÓN");
+   boolean connected=mqttConnected(state);
+   boolean reconnecting=mqttRetrying(state);
 
    LinearLayout head=horizontal();
    TextView app=text("MAZDA AVISOS",21,INK,true);head.addView(app,new LinearLayout.LayoutParams(0,-2,1));
@@ -229,7 +277,8 @@ public final class MainActivity extends Activity {
    LinearLayout hero=card();
    LinearLayout line=horizontal();
    label(line,"CX-6e Aero Grey",19,INK,true);
-   TextView live=text(connected?" ●  En línea":reconnecting?" ◌  Reconectando":" ○  Sin conexión",12,connected?GREEN:MUTED,true);
+   TextView live=text(connected?" ●  En línea":reconnecting?" ◌  Reconectando":" ○  Monitor parado",12,connected?GREEN:reconnecting?0xFFC28A34:MUTED,true);
+   liveIndicator=live;
    LinearLayout.LayoutParams liveP=new LinearLayout.LayoutParams(-2,-2);liveP.leftMargin=dp(10);line.addView(live,liveP);
    hero.addView(line);
    TextView freshness=text(v.age()+(v.stale()&&v.lastDataAt>0?" · no actualizado":""),12,v.stale()?MUTED:GREEN,false);
@@ -328,8 +377,9 @@ public final class MainActivity extends Activity {
    statusCard.addView(details,detailsP);
    rule(statusCard);
    label(statusCard,"◉  Centinela y avisos",14,INK,true);
-   label(statusCard,"Avisos recibidos: "+AlertHistory.read(this).length()+". Monitor: "+
-     (connected?"conectado":"desconectado")+".",12,MUTED,false);
+   label(statusCard,"Avisos recibidos: "+AlertHistory.read(this).length()+".",12,MUTED,false);
+   TextView monitorCounter=text(connected?"Monitor: conectado":reconnecting?"Monitor: reconectando":"Monitor: detenido",12,MUTED,false);
+   statusCard.addView(monitorCounter);monitorCounterText=monitorCounter;
    rowAction(statusCard,"Personalizar notificaciones",()->startActivity(new Intent(this,AlertSettingsActivity.class)));
 
    LinearLayout remoteExtras=card();
@@ -364,14 +414,19 @@ public final class MainActivity extends Activity {
      tools.setVisibility(toolsOpen?View.VISIBLE:View.GONE);
      reveal.setText("Conexión y herramientas   "+(toolsOpen?"▴":"▾"));
    });
-   TextView connectionText=text(connected?"Conexión MQTT activa. Los avisos dependen del servicio, la red y los mensajes de Mazda.":
-     reconnecting?"Se ha perdido la conexión; el monitor está intentando recuperarla.":
-     "Monitor desconectado. Abre «Conectar / autenticar Mazda» para volver a recibir avisos.",13,MUTED,false);
+   TextView connectionText=text(connected?
+     "MQTT conectado. El monitor recibe actualizaciones del coche.":
+     reconnecting?"El monitor está intentando recuperar la conexión MQTT.":
+     "MQTT no activo. El control remoto Mazda y el monitor son conexiones independientes.",13,MUTED,false);
+   monitorConnectionText=connectionText;
    LinearLayout.LayoutParams conP=new LinearLayout.LayoutParams(-1,-2);conP.topMargin=dp(11);tools.addView(connectionText,conP);
    action(tools,"Conectar / autenticar Mazda",()->startActivity(new Intent(this,ConnectionTestActivity.class)),true);
-   if(connected||reconnecting)action(tools,"Detener monitor",()->{
-     startService(new Intent(this,MqttSessionService.class).setAction(MqttSessionService.ACTION_STOP));render();
+   action(tools,"Detener monitor",()->{
+     startService(new Intent(this,MqttSessionService.class).setAction(MqttSessionService.ACTION_STOP));
+     uiHandler.postDelayed(this::updateConnectionUi,250L);
    },false);
+   stopMonitorControl=tools.getChildAt(tools.getChildCount()-1);
+   stopMonitorControl.setVisibility(connected||reconnecting?View.VISIBLE:View.GONE);
    rowAction(tools,"Actualizar pantalla",this::render);
    rowAction(tools,"Detalles de conexión",()->explainState("Estado MQTT",state+"\n\n"+v.age()));
    rowAction(tools,"Compatibilidad de controles",()->explainState("Funciones y límites",
