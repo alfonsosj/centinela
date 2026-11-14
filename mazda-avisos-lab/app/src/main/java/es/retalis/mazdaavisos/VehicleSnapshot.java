@@ -9,12 +9,13 @@ import java.util.Locale;
 final class VehicleSnapshot {
  private static final String PREF="vehicle_display";
  static final int UNKNOWN=-1;
- final Double soc,temp,range;
+ final Double soc,temp,range,humidity,pm25,remoteTemp;
  final int charge,lock,parked,windowsOpen,windowsKnown,trunk,cable,climate,chargeTarget;
  final long lastDataAt;
  final int reports;
  private VehicleSnapshot(SharedPreferences p){
    soc=readDouble(p,"soc");temp=readDouble(p,"temp");range=readDouble(p,"range");
+   humidity=readDouble(p,"humidity");pm25=readDouble(p,"pm25");remoteTemp=readDouble(p,"remote_temp");
    charge=p.getInt("charge",-1);lock=p.getInt("lock",-1);parked=p.getInt("parked",-1);
    windowsOpen=p.getInt("windows_open",0);windowsKnown=p.getInt("windows_known",0);
    trunk=p.getInt("trunk",-1);cable=p.getInt("cable",-1);
@@ -58,6 +59,12 @@ final class VehicleSnapshot {
    Integer cable=code(raw,"chargeConStatus",0,1);
    if(cable==null)cable=code(raw,"acChargeGunConnectionState",0,1);
    if(cable!=null){e.putInt("cable",cable);fresh=true;}
+   Double humidity=number(raw,"insideHumidity",0,100);
+   if(humidity!=null){e.putFloat("humidity",humidity.floatValue());fresh=true;}
+   Double pm25=number(raw,"insidePm25",0,1000);
+   if(pm25!=null){e.putFloat("pm25",pm25.floatValue());fresh=true;}
+   Double remoteTemp=number(raw,"remoteTemp",150,350);
+   if(remoteTemp!=null){e.putFloat("remote_temp",(float)(remoteTemp/10));fresh=true;}
    Integer climate=code(raw,"acStatus",0,1);
    if(climate!=null){e.putInt("climate",climate);fresh=true;}
    Integer target=code(raw,"maxSocPercent",0,100);
@@ -112,6 +119,12 @@ final class VehicleSnapshot {
    }
    JSONObject hvac=data.optJSONObject("hvac");
    if(hvac!=null){
+     Double humidity=number(hvac,"insideHumidity",0,100);
+     if(humidity!=null){edit.putFloat("humidity",humidity.floatValue());updated=true;}
+     Double pm25=number(hvac,"insidePm25",0,1000);
+     if(pm25!=null){edit.putFloat("pm25",pm25.floatValue());updated=true;}
+     Double remoteTemp=number(hvac,"remoteTemp",150,350);
+     if(remoteTemp!=null){edit.putFloat("remote_temp",(float)(remoteTemp/10));updated=true;}
      Integer ac=code(hvac,"acStatus",0,1);
      if(ac!=null){edit.putInt("climate",ac);updated=true;}
      Double t=number(hvac,"insideTemp",-500,800);
@@ -168,6 +181,20 @@ final class VehicleSnapshot {
  }
  boolean stale(){return lastDataAt<=0||System.currentTimeMillis()-lastDataAt>20*60*1000L;}
  String socText(){return soc==null?"—":String.format(Locale.getDefault(),"%.0f%%",soc);}
+ String humidityText(){return humidity==null?"—":String.format(Locale.getDefault(),"%.0f%%",humidity);}
+ String airText(){
+   if(pm25==null)return "Sin datos";
+   return String.format(Locale.getDefault(),"%.0f µg/m³",pm25);
+ }
+ String airQualityText(){
+   if(pm25==null)return "Sin datos";
+   if(pm25<=12)return "Excelente";
+   if(pm25<=35)return "Buena";
+   if(pm25<=55)return "Moderada";
+   return "Alta concentración";
+ }
+ String remoteTempText(){return remoteTemp==null?"—":String.format(Locale.getDefault(),"%.0f°",remoteTemp);}
+
  String tempText(){return temp==null?"—":String.format(Locale.getDefault(),"%.0f°",temp);}
  String rangeText(){return range==null?"—":String.format(Locale.getDefault(),"%.0f km",range);}
  String chargeText(){return charge==1?"Cargando":charge==2?"En espera":charge==0?"Sin cargar":"Estado no disponible";}
