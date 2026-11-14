@@ -90,6 +90,10 @@ public class MainActivity extends Activity {
    wrapper.setOnClickListener(v->startActivity(new Intent(this,VehicleControlActivity.class)
      .putExtra(VehicleControlActivity.EXTRA_ACTION,action)));
  }
+ private void remote(String action){
+   startActivity(new Intent(this,VehicleControlActivity.class)
+     .putExtra(VehicleControlActivity.EXTRA_ACTION,action));
+ }
  private void launchMazda(boolean scan){
    if(scan&&!accessibility()){
      new AlertDialog.Builder(this).setMessage("Activa accesibilidad para la lectura manual de mensajes de Mazda.")
@@ -166,6 +170,12 @@ public class MainActivity extends Activity {
    summaryTile(metrics,"Temperatura",""+car.tempText(),"Interior · °C",INK);
    metrics.addView(new View(this),blank);
    summaryTile(metrics,"Batería",car.socText(),car.chargeText(),INK);
+   LinearLayout batteryDetails=card();
+   label(batteryDetails,"Energía y carga",17,INK,true);
+   label(batteryDetails,"Batería: "+car.socText()+"  ·  Autonomía: "+car.rangeText(),14,INK,true);
+   label(batteryDetails,"Estado: "+car.chargeText()+"  ·  "+car.cableText(),13,MUTED,false);
+   label(batteryDetails,"Objetivo de carga: "+car.targetText(),13,MUTED,false);
+   label(batteryDetails,"El inicio/parada de carga no tiene aún una orden verificada para esta versión.",11,MUTED,false);
    LinearLayout quick=card();
    label(quick,"Estado del vehículo",17,INK,true);
    LinearLayout key=horizontal();LinearLayout.LayoutParams kp=new LinearLayout.LayoutParams(-1,-2);kp.topMargin=dp(9);quick.addView(key,kp);
@@ -174,16 +184,48 @@ public class MainActivity extends Activity {
    TextView lock=text("♧  Cierre\n"+car.doorText(),13,INK,false);
    key.addView(lock,new LinearLayout.LayoutParams(0,-2,1));
    divider(quick);
-   label(quick,"Control remoto de puertas",15,INK,true);
-   LinearLayout controls=horizontal();
-   LinearLayout.LayoutParams controlParams=new LinearLayout.LayoutParams(-1,-2);
-   controlParams.topMargin=dp(12);quick.addView(controls,controlParams);
-   remoteButton(controls,"Bloquear","🔒",VehicleControlActivity.LOCK);
-   controls.addView(new View(this),new LinearLayout.LayoutParams(dp(10),dp(1)));
-   remoteButton(controls,"Desbloquear","🔓",VehicleControlActivity.UNLOCK);
-   TextView controlNote=text("Necesita PIN Mazda y confirmación. Se comprueba el estado después.",11,MUTED,false);
+   label(quick,"Controles remotos",15,INK,true);
+   if(car.lock>=0&&car.freshForControl()){
+     boolean unlocked=car.lock==1;
+     button(quick,unlocked?"🔒  Bloquear puertas":"🔓  Desbloquear puertas",
+       ()->remote(unlocked?VehicleControlActivity.LOCK:VehicleControlActivity.UNLOCK),true);
+   }else{
+     TextView warning=text("Cierre sin estado reciente. Autentica o actualiza primero para evitar órdenes basadas en datos antiguos.",12,MUTED,false);
+     quick.addView(warning);
+     button(quick,"Actualizar estado desde Mazda",()->startActivity(new Intent(this,ConnectionTestActivity.class)),false);
+   }
+   TextView controlNote=text("Un solo botón según el último estado del coche. Cada orden pide confirmación y PIN cuando corresponda.",11,MUTED,false);
    LinearLayout.LayoutParams cn=new LinearLayout.LayoutParams(-1,-2);cn.topMargin=dp(8);quick.addView(controlNote,cn);
    divider(quick);
+   label(quick,"Ventanas y maletero",15,INK,true);
+   TextView trunkInfo=text("Maletero: "+car.trunkText()+"   ·   Ventanas: "+car.windowText(),13,MUTED,false);
+   quick.addView(trunkInfo);
+   if(car.freshForControl()&&car.windowsKnown==4){
+     if(car.windowsOpen>0){
+       button(quick,"▤  Cerrar ventanillas",()->remote(VehicleControlActivity.WINDOWS_CLOSE),false);
+     }else{
+       button(quick,"▤  Abrir ventanillas",()->remote(VehicleControlActivity.WINDOWS_OPEN),false);
+     }
+   }else{
+     label(quick,"Control de ventanillas: requiere estado reciente de las cuatro.",12,MUTED,false);
+   }
+   if(car.freshForControl()&&car.trunk>=0){
+     button(quick,car.trunk==0?"🚗  Abrir maletero":"🚗  Cerrar maletero",
+       ()->remote(car.trunk==0?VehicleControlActivity.TRUNK_OPEN:VehicleControlActivity.TRUNK_CLOSE),false);
+   }else{
+     label(quick,"Control del maletero: esperando estado confirmado.",12,MUTED,false);
+   }
+   divider(quick);
+   label(quick,"Climatización",15,INK,true);
+   label(quick,car.climateText(),13,MUTED,false);
+   if(car.freshForControl()&&car.climate>=0){
+     button(quick,car.climate==1?"❄  Apagar climatización":"❄  Encender climatización",
+       ()->remote(car.climate==1?VehicleControlActivity.CLIMATE_OFF:VehicleControlActivity.CLIMATE_ON),false);
+   }else{
+     label(quick,"Climatización: esperando estado actualizado.",12,MUTED,false);
+   }
+   divider(quick);
+   int events=AlertHistory.read(this).length();
    int events=AlertHistory.read(this).length();
    TextView info=text("◉  Centinela configurable    ·    "+events+" avisos guardados",13,INK,true);
    quick.addView(info);
@@ -233,7 +275,7 @@ public class MainActivity extends Activity {
      android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
      if(clipboard!=null)clipboard.setPrimaryClip(ClipData.newPlainText("Diagnóstico Mazda",Data.technicalDiagnostic(this)));
    });
-   TextView disclaimer=text("Lab v0.14 · Datos reales recibidos por MQTT. Las lecturas pueden estar desactualizadas. No sustituye los avisos oficiales ni es una alarma de seguridad.",11,MUTED,false);
+   TextView disclaimer=text("Lab v0.16 · Datos reales recibidos por MQTT. Las lecturas pueden estar desactualizadas. No sustituye los avisos oficiales ni es una alarma de seguridad.",11,MUTED,false);
    disclaimer.setPadding(0,dp(4),0,dp(8));root.addView(disclaimer);
  }
  @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);render();}
