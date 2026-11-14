@@ -6,8 +6,8 @@ android {
         applicationId 'es.retalis.mazdaavisos'
         minSdk 26
         targetSdk 35
-        versionCode 21
-        versionName '1.0.0-rc2'
+        versionCode 22
+        versionName '1.0.0'
     }
     // Signing material is only available via Actions encrypted secret.
     def signDir = System.getenv('MAZDA_SIGNING_DIR')
