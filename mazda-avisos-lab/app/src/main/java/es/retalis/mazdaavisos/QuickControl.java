@@ -138,6 +138,8 @@ final class QuickControl {
        if(progress.isShowing())progress.dismiss();
        if(activity.isFinishing()||activity.isDestroyed())return;
        if(activity instanceof MainActivity)((MainActivity)activity).render();
+       if(activity instanceof ClimateDashboardActivity)((ClimateDashboardActivity)activity).render();
+       if(activity instanceof BatteryDashboardActivity)((BatteryDashboardActivity)activity).render();
        new AlertDialog.Builder(activity).setTitle(actionLabel(command))
          .setMessage(outcome)
          .setPositiveButton("Aceptar",null).show();
