@@ -22,6 +22,8 @@
   <activity android:name=".AlertSettingsActivity" android:exported="false"/>
   <activity android:name=".VehicleControlActivity" android:exported="false"/>
   <activity android:name=".ControlsActivity" android:exported="false"/>
+  <activity android:name=".ClimateDashboardActivity" android:exported="false"/>
+  <activity android:name=".BatteryDashboardActivity" android:exported="false"/>
   <activity android:name=".ConnectionTestActivity" android:exported="false"/>
   <activity android:name=".CheckActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
   <service android:name=".MazdaQuickTile" android:label="Comprobar Mazda" android:icon="@android:drawable/ic_dialog_info"
