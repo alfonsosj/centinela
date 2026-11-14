@@ -200,30 +200,19 @@ public class MainActivity extends Activity {
    label(quick,"Ventanas y maletero",15,INK,true);
    TextView trunkInfo=text("Maletero: "+car.trunkText()+"   ·   Ventanas: "+car.windowText(),13,MUTED,false);
    quick.addView(trunkInfo);
-   if(car.freshForControl()&&car.windowsKnown==4){
-     if(car.windowsOpen>0){
-       button(quick,"▤  Cerrar ventanillas",()->remote(VehicleControlActivity.WINDOWS_CLOSE),false);
-     }else{
-       button(quick,"▤  Abrir ventanillas",()->remote(VehicleControlActivity.WINDOWS_OPEN),false);
-     }
-   }else{
-     label(quick,"Control de ventanillas: requiere estado reciente de las cuatro.",12,MUTED,false);
-   }
-   if(car.freshForControl()&&car.trunk>=0){
-     button(quick,car.trunk==0?"🚗  Abrir maletero":"🚗  Cerrar maletero",
-       ()->remote(car.trunk==0?VehicleControlActivity.TRUNK_OPEN:VehicleControlActivity.TRUNK_CLOSE),false);
-   }else{
-     label(quick,"Control del maletero: esperando estado confirmado.",12,MUTED,false);
-   }
+   label(quick,"Ventanillas: "+car.windowText()+". Maletero: "+car.trunkText()+".",12,MUTED,false);
+   TextView safetyInfo=text("La app puede consultar y avisar de cambios, pero las órdenes de ventanillas y maletero aún no están verificadas para el CX-6e europeo. Por seguridad no se ofrecen botones de movimiento.",12,MUTED,false);
+   LinearLayout.LayoutParams safetyParams=new LinearLayout.LayoutParams(-1,-2);
+   safetyParams.topMargin=dp(8);quick.addView(safetyInfo,safetyParams);
    divider(quick);
    label(quick,"Climatización",15,INK,true);
-   label(quick,car.climateText(),13,MUTED,false);
-   if(car.freshForControl()&&car.climate>=0){
-     button(quick,car.climate==1?"❄  Apagar climatización":"❄  Encender climatización",
-       ()->remote(car.climate==1?VehicleControlActivity.CLIMATE_OFF:VehicleControlActivity.CLIMATE_ON),false);
-   }else{
-     label(quick,"Climatización: esperando estado actualizado.",12,MUTED,false);
-   }
+   label(quick,car.climateText()+"  ·  Temperatura interior: "+car.tempText(),13,MUTED,false);
+   label(quick,"Control remoto de clima pendiente de validar con Mazda Europa. Seguimos mostrando el estado real cuando está disponible.",12,MUTED,false);
+   divider(quick);
+   label(quick,"Carga y batería",15,INK,true);
+   label(quick,"Batería: "+car.socText()+"  ·  "+car.chargeText(),13,INK,true);
+   label(quick,car.cableText()+"  ·  Objetivo: "+car.targetText(),12,MUTED,false);
+   label(quick,"Inicio/parada remota de carga pendiente de confirmar. Puedes configurar avisos de carga y batería en Ajustes.",12,MUTED,false);
    divider(quick);
    int events=AlertHistory.read(this).length();
    TextView info=text("◉  Centinela configurable    ·    "+events+" avisos guardados",13,INK,true);
@@ -274,7 +263,7 @@ public class MainActivity extends Activity {
      android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
      if(clipboard!=null)clipboard.setPrimaryClip(ClipData.newPlainText("Diagnóstico Mazda",Data.technicalDiagnostic(this)));
    });
-   TextView disclaimer=text("Lab v0.16 · Datos reales recibidos por MQTT. Las lecturas pueden estar desactualizadas. No sustituye los avisos oficiales ni es una alarma de seguridad.",11,MUTED,false);
+   TextView disclaimer=text("Lab v0.17 · Datos reales recibidos por MQTT. Las lecturas pueden estar desactualizadas. No sustituye los avisos oficiales ni es una alarma de seguridad.",11,MUTED,false);
    disclaimer.setPadding(0,dp(4),0,dp(8));root.addView(disclaimer);
  }
  @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);render();}
