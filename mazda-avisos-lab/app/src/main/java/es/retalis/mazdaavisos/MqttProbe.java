@@ -191,6 +191,8 @@ final class MqttProbe {
        if(m.topic.equals(loginOut)&&request.equals(m.json.optString("r")))secret=loginSecret(m.json);
      }
      if(secret==null)throw new IOException("Login MQTT de aplicación no confirmado");
+     // Each successful broker login opens a new trusted observation window.
+     alerts.onMqttConnected();
      feedback.update("MQTT conectado. Recibiendo informes...");
      s.setSoTimeout(4000);
      long until=SystemClock.elapsedRealtime()+seconds*1000L;
@@ -209,6 +211,8 @@ final class MqttProbe {
           if(f.type()==14)throw new IOException("El broker cortó la conexión");
        }catch(java.net.SocketTimeoutException expected){}
        t=SystemClock.elapsedRealtime();
+       // Every socket iteration (including quiet periods) drives one-minute reminders.
+       alerts.tickReminder();
        if(t>update){feedback.update(status());update=t+10000;}
      }
      feedback.update("Prueba finalizada\n"+status());
