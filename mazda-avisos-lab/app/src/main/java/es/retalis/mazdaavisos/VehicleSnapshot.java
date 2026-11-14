@@ -10,13 +10,15 @@ final class VehicleSnapshot {
  private static final String PREF="vehicle_display";
  static final int UNKNOWN=-1;
  final Double soc,temp,range;
- final int charge,lock,parked,windowsOpen,windowsKnown;
+ final int charge,lock,parked,windowsOpen,windowsKnown,trunk,cable,climate,chargeTarget;
  final long lastDataAt;
  final int reports;
  private VehicleSnapshot(SharedPreferences p){
    soc=readDouble(p,"soc");temp=readDouble(p,"temp");range=readDouble(p,"range");
    charge=p.getInt("charge",-1);lock=p.getInt("lock",-1);parked=p.getInt("parked",-1);
    windowsOpen=p.getInt("windows_open",0);windowsKnown=p.getInt("windows_known",0);
+   trunk=p.getInt("trunk",-1);cable=p.getInt("cable",-1);
+   climate=p.getInt("climate",-1);chargeTarget=p.getInt("charge_target",-1);
    lastDataAt=p.getLong("last_data_at",0L);reports=p.getInt("reports",0);
  }
  static VehicleSnapshot read(Context context){
@@ -51,6 +53,15 @@ final class VehicleSnapshot {
    if(temp!=null&&temp!=0){e.putFloat("temp",temp.floatValue());fresh=true;}
    Double range=first(raw,0,1500,"remainedPowerMile","totalResidualMileage");
    if(range!=null){e.putFloat("range",range.floatValue());fresh=true;}
+   Integer trunk=code(raw,"trunk",0,1);
+   if(trunk!=null){e.putInt("trunk",trunk);fresh=true;}
+   Integer cable=code(raw,"chargeConStatus",0,1);
+   if(cable==null)cable=code(raw,"acChargeGunConnectionState",0,1);
+   if(cable!=null){e.putInt("cable",cable);fresh=true;}
+   Integer climate=code(raw,"acStatus",0,1);
+   if(climate!=null){e.putInt("climate",climate);fresh=true;}
+   Integer target=code(raw,"maxSocPercent",0,100);
+   if(target!=null){e.putInt("charge_target",target);fresh=true;}
    Integer locked=code(raw,"driverDoorLock",0,1);
    if(locked!=null){e.putInt("lock",locked);fresh=true;}
    Integer parked=code(raw,"carStatus",1,2);
@@ -101,16 +112,24 @@ final class VehicleSnapshot {
    }
    JSONObject hvac=data.optJSONObject("hvac");
    if(hvac!=null){
+     Integer ac=code(hvac,"acStatus",0,1);
+     if(ac!=null){edit.putInt("climate",ac);updated=true;}
      Double t=number(hvac,"insideTemp",-500,800);
      if(t!=null&&t!=0){edit.putFloat("temp",(float)(t/10.0));updated=true;}
    }
    JSONObject door=data.optJSONObject("door");
    if(door!=null){
+     Integer trunk=code(door,"trunk",0,1);
+     if(trunk!=null){edit.putInt("trunk",trunk);updated=true;}
      Integer locked=code(door,"driverLock",0,1);
      if(locked!=null){edit.putInt("lock",locked);updated=true;}
    }
    JSONObject charge=data.optJSONObject("charge");
    if(charge!=null){
+     Integer cable=code(charge,"chargeConStatus",0,1);
+     if(cable!=null){edit.putInt("cable",cable);updated=true;}
+     Integer target=code(charge,"maxSocPercent",0,100);
+     if(target!=null){edit.putInt("charge_target",target);updated=true;}
      Integer mode=code(charge,"chargeStatus",-1,10);
      if(mode!=null){
        if(mode==0)edit.putInt("charge",0);
@@ -155,4 +174,9 @@ final class VehicleSnapshot {
  String doorText(){return lock==0?"Bloqueado":lock==1?"Desbloqueado":"Sin datos";}
  String locationText(){return parked==1?"Aparcado":parked==0?"Estado no aparcado":"Estado no disponible";}
  String windowText(){return windowsKnown==0?"Sin datos":windowsOpen+" abierta"+(windowsOpen==1?"":"s")+(windowsKnown<4?" · parcial":"");}
+ String trunkText(){return trunk==0?"Cerrado":trunk==1?"Abierto":"Sin datos";}
+ String cableText(){return cable==0?"Sin cable":cable==1?"Enchufado":"Cable sin datos";}
+ String climateText(){return climate==1?"Climatización encendida":climate==0?"Climatización apagada":"Climatización sin datos";}
+ String targetText(){return chargeTarget>0?chargeTarget+" %":"Sin objetivo confirmado";}
+ boolean freshForControl(){return !stale();}
 }
