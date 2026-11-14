@@ -159,8 +159,9 @@ public class ConnectionTestActivity extends Activity {
      if(action!=null&&!action.isEmpty()){
        say("Autenticación completada. Abriendo el control seleccionado...");
        runOnUiThread(()->{
-         Intent next=new Intent(this,VehicleControlActivity.class);
-         next.putExtra(VehicleControlActivity.EXTRA_ACTION,action);
+         boolean inline=getIntent().getBooleanExtra(MainActivity.EXTRA_INLINE_LOGIN,false);
+         Intent next=inline?new Intent(this,MainActivity.class):new Intent(this,VehicleControlActivity.class);
+         next.putExtra(inline?MainActivity.EXTRA_QUICK_ACTION:VehicleControlActivity.EXTRA_ACTION,action);
          startActivity(next);
          finish();
        });
