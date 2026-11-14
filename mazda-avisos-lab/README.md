@@ -1,5 +1,12 @@
 # Mazda Avisos Lab
 
+## 1.1.9 — Icono Mazda con antenas y ojos
+
+- Icono de aplicación aprobado por el usuario: emblema negro de Mazda con antenas y ojos, sobre fondo blanco, conservando el archivo original sin redibujarlo.
+- Icono adaptable para las distintas formas de los lanzadores Android.
+- Versión de la marca con transparencia para los avisos del coche, la notificación persistente del monitor, sus incidencias/reconexiones, el recordatorio de reactivación y el acceso rápido de Android. El sistema aplica el color correspondiente en la barra de estado.
+- `versionCode 32`, misma firma estable para actualizar conservando datos.
+
 ## 1.1.8 — Contenido visible junto a las barras de Android
 
 - Las nueve pantallas de la app comparten un contenedor que reserva el espacio real de la barra de estado, la navegación por botones o gestos y el recorte de cámara.

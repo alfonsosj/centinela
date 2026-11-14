@@ -7,7 +7,7 @@
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
  <queries><package android:name="com.cma.mazda.eu"/></queries>
- <application android:label="Mazda Avisos Lab" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+ <application android:label="Mazda Avisos Lab" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
   <receiver android:name=".MonitorRestartReceiver" android:enabled="true" android:exported="false">
    <intent-filter>
     <action android:name="android.intent.action.BOOT_COMPLETED"/>
@@ -28,7 +28,7 @@
   <activity android:name=".BatteryDashboardActivity" android:exported="false"/>
   <activity android:name=".ConnectionTestActivity" android:exported="false"/>
   <activity android:name=".CheckActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
-  <service android:name=".MazdaQuickTile" android:label="Comprobar Mazda" android:icon="@android:drawable/ic_dialog_info"
+  <service android:name=".MazdaQuickTile" android:label="Comprobar Mazda" android:icon="@drawable/ic_stat_mazda"
     android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true">
     <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
   </service>

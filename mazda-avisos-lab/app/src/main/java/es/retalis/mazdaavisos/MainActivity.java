@@ -113,7 +113,7 @@ public final class MainActivity extends SafeAreaActivity {
      manager.createNotificationChannel(new NotificationChannel(CHANNEL,"Avisos Mazda experimentales",NotificationManager.IMPORTANCE_HIGH));
    if(Build.VERSION.SDK_INT>=33&&context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return;
    PendingIntent open=PendingIntent.getActivity(context,0,new Intent(context,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-   Notification n=new Notification.Builder(context,CHANNEL).setSmallIcon(android.R.drawable.ic_dialog_info)
+   Notification n=new Notification.Builder(context,CHANNEL).setSmallIcon(R.drawable.ic_stat_mazda)
      .setContentTitle(title).setContentText(body).setStyle(new Notification.BigTextStyle().bigText(body))
      .setContentIntent(open).setAutoCancel(true).build();
    manager.notify(id,n);
@@ -454,7 +454,7 @@ public final class MainActivity extends SafeAreaActivity {
      android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
      if(clipboard!=null)clipboard.setPrimaryClip(ClipData.newPlainText("Diagnóstico Mazda",Data.technicalDiagnostic(this)));
    });
-   TextView disclaimer=text("Mazda Avisos 1.1.8 · Datos y alertas sujetos a conexión. Los controles adicionales no están validados en este vehículo. No sustituye el sistema oficial ni una alarma.",11,MUTED,false);
+   TextView disclaimer=text("Mazda Avisos 1.1.9 · Datos y alertas sujetos a conexión. Los controles adicionales no están validados en este vehículo. No sustituye el sistema oficial ni una alarma.",11,MUTED,false);
    disclaimer.setPadding(0,dp(4),0,dp(6));root.addView(disclaimer);
  }
  @Override public void onRequestPermissionsResult(int code,String[] perms,int[] results){

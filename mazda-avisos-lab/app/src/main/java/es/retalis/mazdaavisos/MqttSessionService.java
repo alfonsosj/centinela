@@ -67,7 +67,7 @@ public final class MqttSessionService extends Service {
    PendingIntent open=PendingIntent.getActivity(this,HEALTH_ID,new Intent(this,MainActivity.class),
      PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
    nm.notify(HEALTH_ID,new Notification.Builder(this,HEALTH_CHANNEL)
-     .setSmallIcon(android.R.drawable.stat_notify_error).setContentTitle(title).setContentText(body)
+     .setSmallIcon(R.drawable.ic_stat_mazda).setContentTitle(title).setContentText(body)
      .setStyle(new Notification.BigTextStyle().bigText(body))
      .setContentIntent(open).setAutoCancel(true).build());
  }
@@ -153,7 +153,7 @@ public final class MqttSessionService extends Service {
    Intent stop=new Intent(this,MqttSessionService.class).setAction(ACTION_STOP);
    PendingIntent stopButton=PendingIntent.getService(this,13,stop,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
    return new Notification.Builder(this,NOTIFY_CHANNEL)
-     .setSmallIcon(android.R.drawable.stat_notify_sync)
+     .setSmallIcon(R.drawable.ic_stat_mazda)
      .setContentTitle("Mazda Avisos Lab · MQTT")
      .setContentText(text.length()>110?text.substring(0,110):text)
      .setContentIntent(open)

@@ -50,7 +50,7 @@ public final class MonitorRestartReceiver extends BroadcastReceiver {
       new Intent(context,MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP),
       PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
     Notification notification=new Notification.Builder(context,REMINDER_CHANNEL)
-      .setSmallIcon(android.R.drawable.stat_notify_error)
+      .setSmallIcon(R.drawable.ic_stat_mazda)
       .setContentTitle("Mazda Avisos: reactivar monitor")
       .setContentText(reason)
       .setStyle(new Notification.BigTextStyle().bigText(reason))
