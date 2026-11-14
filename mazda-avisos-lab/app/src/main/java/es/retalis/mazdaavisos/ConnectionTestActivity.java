@@ -39,7 +39,7 @@ public class ConnectionTestActivity extends Activity {
  private static final String EU="https://cma-m.iov.changanauto.com.de/cma-app-gw";
  private static final String CA="https://ca-m.iov.changanauto.com.de";
  // Clave pública RSA 2048 del servicio de autenticación, publicada por la integración comunitaria.
- private static final String SERVER_RSA="MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkyhr43cBPTJ3jLiYsmbUwUp74cMJIOju5vqVzgtuK63Q99qV6iVT8wN5cXlyMtWI2mfOmhIao/fUN821im69MfOHsWXdqQEo5e9v654GPw+bju0pCphEPtD1I0VcyS34QkAu04urSun2U1q3Dr2OICLVWSnLa+01ioKxkaB0D209zXcls2eFQpvRAWm7xxVsoqzSwqp+neu5quOpn+eO/bW0TxcSQ8VZcDEUvadRTLSR0eOWgRuHIBiD2RGqPIPzKCm5A14q1qhxUZ8U0pmYe0Sx7eMy4RVe2iW7fnjc6pxTUMBkercSL26mevYouuCKqyie+LVQAtGa29RMl/lyiwIDAQAB";
+ static final String SERVER_RSA="MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkyhr43cBPTJ3jLiYsmbUwUp74cMJIOju5vqVzgtuK63Q99qV6iVT8wN5cXlyMtWI2mfOmhIao/fUN821im69MfOHsWXdqQEo5e9v654GPw+bju0pCphEPtD1I0VcyS34QkAu04urSun2U1q3Dr2OICLVWSnLa+01ioKxkaB0D209zXcls2eFQpvRAWm7xxVsoqzSwqp+neu5quOpn+eO/bW0TxcSQ8VZcDEUvadRTLSR0eOWgRuHIBiD2RGqPIPzKCm5A14q1qhxUZ8U0pmYe0Sx7eMy4RVe2iW7fnjc6pxTUMBkercSL26mevYouuCKqyie+LVQAtGa29RMl/lyiwIDAQAB";
  private final ExecutorService executor=Executors.newSingleThreadExecutor();
  private EditText emailField,passwordField,codeField;
  private TextView status;
@@ -48,6 +48,7 @@ public class ConnectionTestActivity extends Activity {
  private JSONObject mqttConfig;
  private String mqttSecret;
  private String token=null,encryptedEmail=null,deviceId=null;
+ private java.security.PrivateKey controlKey=null;
  private String previousMessage="";
  @Override public void onCreate(Bundle state){
    super.onCreate(state);
@@ -182,7 +183,24 @@ public class ConnectionTestActivity extends Activity {
          }
        }
      }
-     if(authReady && cfg!=null && reports>0){mqttConfig=cfg;mqttSecret=auth.optString("authToken");runOnUiThread(()->{listenButton.setVisibility(View.VISIBLE);sessionButton.setVisibility(View.VISIBLE);});}
+     if(authReady && cfg!=null && reports>0){
+       mqttConfig=cfg;mqttSecret=auth.optString("authToken");
+       runOnUiThread(()->{listenButton.setVisibility(View.VISIBLE);sessionButton.setVisibility(View.VISIBLE);});
+     }
+     if(controlKey!=null&&token!=null&&!token.isEmpty()){
+       ControlSession.set(token,deviceId,carId,controlKey);
+       controlKey=null;
+     }
+     String requestedAction=getIntent().getStringExtra(VehicleControlActivity.EXTRA_ACTION);
+     if(VehicleControlActivity.LOCK.equals(requestedAction)||VehicleControlActivity.UNLOCK.equals(requestedAction)){
+       runOnUiThread(()->{
+         Intent next=new Intent(this,VehicleControlActivity.class);
+         next.putExtra(VehicleControlActivity.EXTRA_ACTION,requestedAction);
+         startActivity(next);
+         finish();
+       });
+       return;
+     }
      String initialInfo=readInitialVehicleStatus(carId);
       say("PRUEBA TERMINADA\n\nVehículos visibles: "+vehicles.length()+
        "\nConfiguración THU: disponible"+
@@ -256,7 +274,7 @@ public class ConnectionTestActivity extends Activity {
    }
    return null;
  }
- private static String encrypt(PublicKey key,String input)throws Exception{
+ static String encrypt(PublicKey key,String input)throws Exception{
    byte[] in=input.getBytes(StandardCharsets.UTF_8);
    Cipher cipher=Cipher.getInstance("RSA/ECB/PKCS1Padding");
    cipher.init(Cipher.ENCRYPT_MODE,key);
@@ -312,5 +330,5 @@ public class ConnectionTestActivity extends Activity {
    if(m.length()>160)m=m.substring(0,160);
    return m.replaceAll("(?i)bearer\\s+[A-Za-z0-9._\\-]+","[oculto]");
  }
- @Override protected void onDestroy(){if(probe!=null)probe.close();mqttConfig=null;mqttSecret=null;token=null;encryptedEmail=null;executor.shutdownNow();super.onDestroy();}
+ @Override protected void onDestroy(){if(probe!=null)probe.close();mqttConfig=null;mqttSecret=null;token=null;encryptedEmail=null;controlKey=null;executor.shutdownNow();super.onDestroy();}
 }

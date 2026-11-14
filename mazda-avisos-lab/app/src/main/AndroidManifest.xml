@@ -13,6 +13,7 @@
     android:value="Continuous user-initiated read-only MQTT subscription for immediate vehicle status change notifications. Cannot use periodic scheduled jobs for real-time alerts."/>
   </service>
   <activity android:name=".AlertSettingsActivity" android:exported="false"/>
+  <activity android:name=".VehicleControlActivity" android:exported="false"/>
   <activity android:name=".ConnectionTestActivity" android:exported="false"/>
   <activity android:name=".CheckActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
   <service android:name=".MazdaQuickTile" android:label="Comprobar Mazda" android:icon="@android:drawable/ic_dialog_info"

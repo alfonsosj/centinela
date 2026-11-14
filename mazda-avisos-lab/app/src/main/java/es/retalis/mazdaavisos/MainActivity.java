@@ -78,6 +78,18 @@ public class MainActivity extends Activity {
    LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,0,1);np.topMargin=dp(7);tile.addView(number,np);
    label(tile,foot,12,MUTED,false);
  }
+ private void remoteButton(LinearLayout row,String label,String glyph,String action){
+   LinearLayout wrapper=vertical();
+   wrapper.setGravity(Gravity.CENTER);
+   wrapper.setPadding(dp(8),dp(12),dp(8),dp(12));
+   wrapper.setBackground(bg(BG,20));
+   row.addView(wrapper,new LinearLayout.LayoutParams(0,-2,1));
+   TextView icon=text(glyph,28,INK,false);icon.setGravity(Gravity.CENTER);wrapper.addView(icon);
+   TextView title=text(label,13,INK,true);title.setGravity(Gravity.CENTER);wrapper.addView(title);
+   wrapper.setContentDescription(label+" puertas del vehículo");
+   wrapper.setOnClickListener(v->startActivity(new Intent(this,VehicleControlActivity.class)
+     .putExtra(VehicleControlActivity.EXTRA_ACTION,action)));
+ }
  private void launchMazda(boolean scan){
    if(scan&&!accessibility()){
      new AlertDialog.Builder(this).setMessage("Activa accesibilidad para la lectura manual de mensajes de Mazda.")
@@ -158,6 +170,16 @@ public class MainActivity extends Activity {
    TextView lock=text("♧  Cierre\n"+car.doorText(),13,INK,false);
    key.addView(lock,new LinearLayout.LayoutParams(0,-2,1));
    divider(quick);
+   label(quick,"Control remoto de puertas",15,INK,true);
+   LinearLayout controls=horizontal();
+   LinearLayout.LayoutParams controlParams=new LinearLayout.LayoutParams(-1,-2);
+   controlParams.topMargin=dp(12);quick.addView(controls,controlParams);
+   remoteButton(controls,"Bloquear","🔒",VehicleControlActivity.LOCK);
+   controls.addView(new View(this),new LinearLayout.LayoutParams(dp(10),dp(1)));
+   remoteButton(controls,"Desbloquear","🔓",VehicleControlActivity.UNLOCK);
+   TextView controlNote=text("Necesita PIN Mazda y confirmación. Se comprueba el estado después.",11,MUTED,false);
+   LinearLayout.LayoutParams cn=new LinearLayout.LayoutParams(-1,-2);cn.topMargin=dp(8);quick.addView(controlNote,cn);
+   divider(quick);
    int events=AlertHistory.read(this).length();
    TextView info=text("◉  Centinela configurable    ·    "+events+" avisos guardados",13,INK,true);
    quick.addView(info);
@@ -207,7 +229,7 @@ public class MainActivity extends Activity {
      android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
      if(clipboard!=null)clipboard.setPrimaryClip(ClipData.newPlainText("Diagnóstico Mazda",Data.technicalDiagnostic(this)));
    });
-   TextView disclaimer=text("Lab v0.12 · Datos reales recibidos por MQTT. Las lecturas pueden estar desactualizadas. No sustituye los avisos oficiales ni es una alarma de seguridad.",11,MUTED,false);
+   TextView disclaimer=text("Lab v0.14 · Datos reales recibidos por MQTT. Las lecturas pueden estar desactualizadas. No sustituye los avisos oficiales ni es una alarma de seguridad.",11,MUTED,false);
    disclaimer.setPadding(0,dp(4),0,dp(8));root.addView(disclaimer);
  }
  @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);render();}

@@ -26,3 +26,14 @@ como actualización conservando datos.
 Además, v0.13 consulta el estado inicial del coche por API Mazda Europa al autenticar la
 cuenta secundaria, alimentando las tarjetas de batería y temperatura sin esperar
 actualizaciones MQTT.
+
+
+## v0.14: bloqueo/desbloqueo remoto experimental
+
+- Controles de bloqueo y desbloqueo con sesión de la cuenta secundaria.
+- PIN de Mazda de seis cifras solicitado para cada orden, no se guarda.
+- Confirmación obligatoria antes de actuar.
+- PIN autorizado por Mazda, número de serie de control descifrado con RSA, petición RSA-SHA256 firmada, consulta del resultado y verificación independiente del estado de las dos cerraduras.
+- La sesión de control dura 15 minutos como máximo en RAM, sin persistir token o clave de control.
+- Nunca activa operaciones de forma automática ni supone ejecución correcta por una simple respuesta HTTP.
+- Debe verificarse en el vehículo real, aparcado y en condiciones seguras.
