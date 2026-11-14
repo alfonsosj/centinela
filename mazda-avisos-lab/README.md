@@ -37,3 +37,37 @@ actualizaciones MQTT.
 - La sesión de control dura 15 minutos como máximo en RAM, sin persistir token o clave de control.
 - Nunca activa operaciones de forma automática ni supone ejecución correcta por una simple respuesta HTTP.
 - Debe verificarse en el vehículo real, aparcado y en condiciones seguras.
+
+
+## 1.0.0 RC1 — compilación integral
+
+Esta compilación agrupa el diseño CX-6e Aero Grey, cuatro iconos de estado,
+notificaciones MQTT en servicio de primer plano, alertas configurables,
+Centinela básico por cambios de apertura, historial local y consultas de batería,
+temperatura, autonomía, carga, cable, objetivo, ventanas, maletero y climatización
+cuando Mazda proporciona el valor.
+
+Controles remotos disponibles en la interfaz con consentimiento individual:
+- Bloquear/desbloquear puertas: probado con el vehículo del usuario.
+- Abrir/cerrar las cuatro ventanas y portón: protocolo europeo conocido;
+  requiere PIN, coche aparcado y telemetría reciente; no probado físicamente.
+- Climatización remota y objetivo de temperatura, desempañado, calefacción del volante,
+  calefacción/ventilación de los asientos delanteros, encontrar vehículo y bocina,
+  y porcentaje máximo de carga 60–100%: comandos implementados en base
+  a la API comunitaria de Mazda Europa; no validados físicamente.
+- Actualización puntual de estado por HTTP autenticado; no envía órdenes.
+- Se registra localmente el resultado comunicado por Mazda de cada orden;
+  no se almacenan PIN, contraseña o token en el historial.
+
+**No equivalen a funciones verificadas** los comandos que solo han superado
+compilación; pueden ser rechazados por permisos, equipamiento, red o cambios en API.
+El resultado puede quedar 'sin confirmar' aunque la petición haya sido aceptada.
+
+**No incluidos**: start/stop carga remoto sin protocolo confirmado, eventos
+de ocupantes de Centro de Mensajes por MQTT (no observados), DVR/cámaras ni
+alarmas reales de intrusión, garantía 24/7 o arranque automático del monitor
+tras reiniciar el móvil. El servicio MQTT depende del sistema operativo,
+permisos y la validez temporal de la autorización; su estado debe comprobarse.
+
+**Firma**: mantenida mediante secreto privado de GitHub Actions. versionCode 20
+permite actualizar v0.18/v0.19 firmadas con la misma clave sin reinstalar.
