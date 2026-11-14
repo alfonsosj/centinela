@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Execute the previously verified command implementation in place (without
- * navigating to VehicleControlActivity). No optimistic UI updates, no stored PIN.
+ * navigating to VehicleControlActivity). No optimistic UI updates; PIN temporal de sesión en RAM.
  */
 final class QuickControl {
  private static final AtomicBoolean BUSY=new AtomicBoolean(false);
@@ -63,10 +63,6 @@ final class QuickControl {
    }
    boolean pinRequired=command.equals(VehicleControlActivity.LOCK)||
      command.equals(VehicleControlActivity.UNLOCK)||hardware;
-   final EditText pin=new EditText(activity);
-   pin.setHint("PIN Mazda de seis cifras");
-   pin.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-   pin.setFilters(new InputFilter[]{new InputFilter.LengthFilter(6)});
    LinearLayout layout=new LinearLayout(activity);
    layout.setOrientation(1);int pad=dp(activity,20);
    layout.setPadding(pad,0,pad,0);
@@ -77,18 +73,19 @@ final class QuickControl {
      "La orden se envía a Mazda y puede tardar varios segundos en confirmarse.";
    help.setText(warning);
    layout.addView(help);
-   if(pinRequired)layout.addView(pin);
+   if(pinRequired)help.setText(warning+" El PIN ya se verificó al iniciar sesión.");
    final AlertDialog confirm=new AlertDialog.Builder(activity)
      .setTitle(title).setView(layout)
      .setNegativeButton("Cancelar",null)
      .setPositiveButton("Enviar orden",null).create();
    confirm.setOnShowListener(d->confirm.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-     String code=pinRequired?pin.getText().toString():"";
-     if(pinRequired&&!code.matches("[0-9]{6}")){
-       pin.setError("Introduce exactamente 6 cifras");
+     String code=pinRequired?ControlSession.pinFor(session):"";
+     if(pinRequired&&code==null){
+       confirm.dismiss();
+       new AlertDialog.Builder(activity).setMessage("La sesión Mazda ha caducado. Autentícate otra vez.")
+         .setPositiveButton("Entendido",null).show();
        return;
      }
-     pin.setText("");
      confirm.dismiss();
      send(activity,session,command,code,temp);
    }));
