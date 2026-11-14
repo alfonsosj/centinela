@@ -226,6 +226,11 @@ public final class MainActivity extends Activity {
    TextView freshness=text(v.age()+(v.stale()&&v.lastDataAt>0?" · no actualizado":""),12,v.stale()?MUTED:GREEN,false);
    LinearLayout.LayoutParams freshP=new LinearLayout.LayoutParams(-1,-2);freshP.topMargin=dp(7);
    hero.addView(freshness,freshP);
+   TextView refresh=text("↻ Actualizar vehículo",12,INK,true);
+   refresh.setGravity(Gravity.RIGHT);
+   refresh.setPadding(dp(3),dp(8),dp(3),dp(4));
+   refresh.setOnClickListener(view->remote(VehicleControlActivity.REFRESH));
+   hero.addView(refresh);
    ImageView carImage=new ImageView(this);
    carImage.setImageResource(R.drawable.cx6e_aerogrey);
    carImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -246,7 +251,10 @@ public final class MainActivity extends Activity {
    controlCircle(buttons,"Cierre",VehicleStateIconView.LOCK,lockStatus,()->{
      VehicleSnapshot now=VehicleSnapshot.read(this);
      if(now.lock<0||!now.freshForControl()){
-       explainState("Actualización necesaria","Necesitamos una lectura reciente de cierre para decidir si bloquear o desbloquear. Abre la configuración de conexión y actualiza Mazda.");
+       new AlertDialog.Builder(this).setTitle("Actualización necesaria")
+         .setMessage("La última lectura del cierre no es suficientemente reciente. Consulta Mazda antes de enviar una orden.")
+         .setPositiveButton("Actualizar", (dialog,which)->remote(VehicleControlActivity.REFRESH))
+         .setNegativeButton("Cancelar",null).show();
        return;
      }
      remote(now.lock==0?VehicleControlActivity.UNLOCK:VehicleControlActivity.LOCK);
@@ -272,6 +280,8 @@ public final class MainActivity extends Activity {
    statusCard.addView(details,detailsP);
    rule(statusCard);
    label(statusCard,"◉  Centinela y avisos",14,INK,true);
+   label(statusCard,"Avisos recibidos: "+AlertHistory.read(this).length()+". Monitor: "+
+     (connected?"conectado":"desconectado")+".",12,MUTED,false);
    rowAction(statusCard,"Personalizar notificaciones",()->startActivity(new Intent(this,AlertSettingsActivity.class)));
 
    LinearLayout remoteExtras=card();
@@ -324,7 +334,7 @@ public final class MainActivity extends Activity {
      android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
      if(clipboard!=null)clipboard.setPrimaryClip(ClipData.newPlainText("Diagnóstico Mazda",Data.technicalDiagnostic(this)));
    });
-   TextView disclaimer=text("Mazda Avisos Lab v0.19 · Controles adicionales experimentales. Las órdenes pueden ser rechazadas o no verificables. No sustituye los avisos oficiales ni es una alarma.",11,MUTED,false);
+   TextView disclaimer=text("Mazda Avisos 1.0 RC · Datos y alertas sujetos a conexión. Los controles adicionales no están validados en este vehículo. No sustituye el sistema oficial ni una alarma.",11,MUTED,false);
    disclaimer.setPadding(0,dp(4),0,dp(6));root.addView(disclaimer);
  }
  @Override public void onRequestPermissionsResult(int code,String[] perms,int[] results){
