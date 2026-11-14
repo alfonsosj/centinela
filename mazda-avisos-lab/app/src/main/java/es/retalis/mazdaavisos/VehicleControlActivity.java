@@ -100,23 +100,26 @@ public final class VehicleControlActivity extends Activity {
    ScrollView scroller=new ScrollView(this);scroller.setBackgroundColor(0xFFF6F7FB);
    LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(22),dp(32),dp(22),dp(24));
    scroller.addView(root);setContentView(scroller);
-   root.addView(text("CONTROL REMOTO MAZDA",23,true));
-   TextView caption=text("Solo cuenta Mazda compartida y autorizada. No se envía ninguna orden hasta confirmarla.",14,false);
+   root.addView(text("MAZDA AVISOS · CONTROL",23,true));
+   TextView caption=text("Cuenta secundaria autorizada · Cada acción requiere confirmación y se verifica cuando Mazda proporciona el estado.",14,false);
    caption.setPadding(0,dp(12),0,dp(22));root.addView(caption);
    LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(18),dp(22),dp(18),dp(22));
    card.setBackground(round(Color.WHITE));root.addView(card);
    boolean needsPin=protectedAction(action);
    card.addView(text(actionName(action),20,true));
-   TextView instruction=text(needsPin?
-     "Introduce el PIN de control Mazda de 6 cifras. Se utiliza solo para autorizar esta orden y nunca se almacena.":
-     "Esta orden utiliza una solicitud firmada a Mazda Europa. Las funciones nuevas son experimentales y requieren confirmación.",14,false);
+   TextView instruction=text(REFRESH.equals(action)?
+     "Consulta de solo lectura. No se envía ninguna orden al coche.":
+     needsPin?"Introduce el PIN Mazda de 6 cifras. No se almacena.":
+     "Orden de Mazda Europa firmada y confirmada. Algunas funciones dependen del equipamiento y aún no se han comprobado físicamente.",14,false);
    instruction.setPadding(0,dp(14),0,dp(12));card.addView(instruction);
-   state=text("Sin enviar órdenes al vehículo.",13,false);card.addView(state);
+   state=text(REFRESH.equals(action)?"Sin consultar todavía.":"Sin enviar órdenes al vehículo.",13,false);card.addView(state);
    ControlSession.State s=ControlSession.get();
    if(s==null){
      TextView hint=text("Necesitas iniciar sesión con la cuenta secundaria. La sesión de control solo dura 15 minutos y se guarda exclusivamente en memoria.",14,false);
      hint.setPadding(0,dp(15),0,dp(15));card.addView(hint);
      Button login=new Button(this);login.setText("Autenticar cuenta Mazda");
+     login.setAllCaps(false);login.setTextColor(Color.WHITE);
+     login.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF263548));
      card.addView(login);login.setOnClickListener(v->{
        Intent i=new Intent(this,ConnectionTestActivity.class).putExtra(EXTRA_ACTION,action);
        startActivity(i);finish();
@@ -167,6 +170,8 @@ public final class VehicleControlActivity extends Activity {
      }
      sendButton=new Button(this);
      sendButton.setText(REFRESH.equals(action)?"Actualizar ahora":"Solicitar: "+actionName(action));
+     sendButton.setAllCaps(false);sendButton.setTextColor(Color.WHITE);
+     sendButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF263548));
      card.addView(sendButton);
      sendButton.setOnClickListener(v->{if(REFRESH.equals(action))refresh();else confirm();});
      TextView status=text(REFRESH.equals(action)?
@@ -174,7 +179,9 @@ public final class VehicleControlActivity extends Activity {
        "Tras cada orden se intenta verificar el estado real. Si falta confirmación, se indica expresamente.",12,false);
      status.setPadding(0,dp(12),0,0);card.addView(status);
    }
-   Button back=new Button(this);back.setText("Volver al vehículo");root.addView(back);
+   Button back=new Button(this);back.setText("Volver al vehículo");
+   back.setAllCaps(false);back.setTextColor(0xFF263548);
+   back.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFE9ECF4));root.addView(back);
    back.setOnClickListener(v->finish());
  }
  private void refresh(){
