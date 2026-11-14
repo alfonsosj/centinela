@@ -92,6 +92,7 @@ public class ConnectionTestActivity extends Activity {
        String encPassword=encrypt(key,password);
        KeyPairGenerator generator=KeyPairGenerator.getInstance("RSA");generator.initialize(2048);
        KeyPair pair=generator.generateKeyPair();
+       controlKey=pair.getPrivate();
        String controlPublic=Base64.encodeToString(pair.getPublic().getEncoded(),Base64.DEFAULT);
        JSONObject body=new JSONObject().put("loginTime",String.valueOf(System.currentTimeMillis()/1000))
            .put("email",encryptedEmail).put("password",encPassword).put("pubKey",controlPublic);
@@ -149,6 +150,22 @@ public class ConnectionTestActivity extends Activity {
      if(vehicle==null)throw new Exception("Listado de vehículos inesperado");
      String carId=vehicle.optString("carId",vehicle.optString("vehicleId",""));
      if(carId.isEmpty())throw new Exception("El vehículo carece de identificador de consulta");
+     // El inicio de control remoto solo necesita una sesión y un vehículo autorizado.
+     if(controlKey==null||token==null||token.isEmpty())
+       throw new Exception("No se ha podido completar la sesión de control");
+     ControlSession.set(token,deviceId,carId,controlKey);
+     controlKey=null;
+     String action=getIntent().getStringExtra(VehicleControlActivity.EXTRA_ACTION);
+     if(VehicleControlActivity.LOCK.equals(action)||VehicleControlActivity.UNLOCK.equals(action)){
+       say("Autenticación completada. Abriendo la pantalla del PIN...");
+       runOnUiThread(()->{
+         Intent next=new Intent(this,VehicleControlActivity.class);
+         next.putExtra(VehicleControlActivity.EXTRA_ACTION,action);
+         startActivity(next);
+         finish();
+       });
+       return;
+     }
      JSONObject functions=post(CA+"/user-apigw/vot-connect-conf-center/api/device/appGetCarConfFunc",
        new JSONObject().put("carId",carId),true);
      String thu=findThu(functions.opt("data"),0);
@@ -186,20 +203,6 @@ public class ConnectionTestActivity extends Activity {
      if(authReady && cfg!=null && reports>0){
        mqttConfig=cfg;mqttSecret=auth.optString("authToken");
        runOnUiThread(()->{listenButton.setVisibility(View.VISIBLE);sessionButton.setVisibility(View.VISIBLE);});
-     }
-     if(controlKey!=null&&token!=null&&!token.isEmpty()){
-       ControlSession.set(token,deviceId,carId,controlKey);
-       controlKey=null;
-     }
-     String requestedAction=getIntent().getStringExtra(VehicleControlActivity.EXTRA_ACTION);
-     if(VehicleControlActivity.LOCK.equals(requestedAction)||VehicleControlActivity.UNLOCK.equals(requestedAction)){
-       runOnUiThread(()->{
-         Intent next=new Intent(this,VehicleControlActivity.class);
-         next.putExtra(VehicleControlActivity.EXTRA_ACTION,requestedAction);
-         startActivity(next);
-         finish();
-       });
-       return;
      }
      String initialInfo=readInitialVehicleStatus(carId);
       say("PRUEBA TERMINADA\n\nVehículos visibles: "+vehicles.length()+
