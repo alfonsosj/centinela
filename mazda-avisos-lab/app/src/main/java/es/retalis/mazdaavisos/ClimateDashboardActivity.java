@@ -13,7 +13,7 @@ import android.widget.*;
 import java.util.Locale;
 
 /** Climate screen modelled after the official Mazda layout with live data only. */
-public final class ClimateDashboardActivity extends Activity {
+public final class ClimateDashboardActivity extends SafeAreaActivity {
  private static final int INK=0xFF202630,MUTED=0xFF9A9DA9,PURPLE=0xFF9392E6,WHITE=Color.WHITE;
  private static final int BG=0xFFF5F4FB;
  private boolean seats=false;

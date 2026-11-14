@@ -8,7 +8,7 @@ import android.graphics.Color;
 import android.widget.*;
 
 /** Opciones locales: no se comparte ninguna configuración con servidores. */
-public final class AlertSettingsActivity extends Activity {
+public final class AlertSettingsActivity extends SafeAreaActivity {
  private LinearLayout root;
  private SharedPreferences preferences;
  @Override public void onCreate(Bundle state){

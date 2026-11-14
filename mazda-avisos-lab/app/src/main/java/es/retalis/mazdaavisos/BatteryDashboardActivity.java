@@ -12,7 +12,7 @@ import android.view.View;
 import android.widget.*;
 
 /** Readable battery overview with only validated Mazda operations enabled. */
-public final class BatteryDashboardActivity extends Activity {
+public final class BatteryDashboardActivity extends SafeAreaActivity {
  private static final int BG=0xFFF3F2FA,INK=0xFF252A33,MUTED=0xFF9C9DA9,WHITE=Color.WHITE,PURPLE=0xFF9393E8;
  private LinearLayout root;
  private int dp(float x){return (int)(x*getResources().getDisplayMetrics().density+.5f);}

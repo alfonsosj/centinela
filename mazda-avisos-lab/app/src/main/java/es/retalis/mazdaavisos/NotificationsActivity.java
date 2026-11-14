@@ -22,7 +22,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /** Local Mazda alert history and explicit links to this app's Android settings. */
-public final class NotificationsActivity extends Activity {
+public final class NotificationsActivity extends SafeAreaActivity {
  private static final int INK=0xFF263548,MUTED=0xFF596677,BG=0xFFF4F5FB;
  private LinearLayout root;
  private ScrollView scroll;
@@ -114,7 +114,6 @@ public final class NotificationsActivity extends Activity {
  private void render(){
    int previousY=scroll==null?0:scroll.getScrollY();
    scroll=new ScrollView(this);scroll.setBackgroundColor(BG);scroll.setFillViewport(true);
-   scroll.setFitsSystemWindows(true);
    root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(18),dp(18),dp(18),dp(30));
    scroll.addView(root);setContentView(scroll);
    button(root,"‹ Volver",this::finish);

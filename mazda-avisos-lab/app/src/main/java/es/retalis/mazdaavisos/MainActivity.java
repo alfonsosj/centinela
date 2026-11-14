@@ -21,7 +21,7 @@ import org.json.JSONObject;
  * v0.18: Minimal vehicle dashboard styled after the visual hierarchy
  * of the official application, using original vector icons and artwork.
  */
-public final class MainActivity extends Activity {
+public final class MainActivity extends SafeAreaActivity {
  static final String CHANNEL="mazda_lab_alerts";
  static final String EXTRA_INLINE_LOGIN="quick_control_after_login",EXTRA_QUICK_ACTION="quick_control_action";
  private static final int INK=0xFF263548, MUTED=0xFF89909B, BG=0xFFF4F5FB, WHITE=Color.WHITE;
@@ -454,7 +454,7 @@ public final class MainActivity extends Activity {
      android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
      if(clipboard!=null)clipboard.setPrimaryClip(ClipData.newPlainText("Diagnóstico Mazda",Data.technicalDiagnostic(this)));
    });
-   TextView disclaimer=text("Mazda Avisos 1.1.7 · Datos y alertas sujetos a conexión. Los controles adicionales no están validados en este vehículo. No sustituye el sistema oficial ni una alarma.",11,MUTED,false);
+   TextView disclaimer=text("Mazda Avisos 1.1.8 · Datos y alertas sujetos a conexión. Los controles adicionales no están validados en este vehículo. No sustituye el sistema oficial ni una alarma.",11,MUTED,false);
    disclaimer.setPadding(0,dp(4),0,dp(6));root.addView(disclaimer);
  }
  @Override public void onRequestPermissionsResult(int code,String[] perms,int[] results){

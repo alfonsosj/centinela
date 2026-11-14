@@ -16,7 +16,7 @@ import android.view.View;
  * All Mazda EU cloud-control actions in a discoverable, one-screen catalogue.
  * Displaying an action does not certify vehicle-specific compatibility.
  */
-public final class ControlsActivity extends Activity {
+public final class ControlsActivity extends SafeAreaActivity {
   private static final int INK=0xFF263548, MUTED=0xFF818C9D,
     BG=0xFFF5F6FA, WHITE=Color.WHITE, BLUE=0xFF898BEA, BORDER=0xFFE8EAF1;
   private LinearLayout root;

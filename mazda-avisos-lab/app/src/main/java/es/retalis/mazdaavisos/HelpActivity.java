@@ -19,7 +19,7 @@ import java.text.Normalizer;
 import java.util.Locale;
 
 /** Searchable, offline instructions matching the controls implemented in this app. */
-public final class HelpActivity extends Activity {
+public final class HelpActivity extends SafeAreaActivity {
  private static final int INK=0xFF263548,MUTED=0xFF596677,BG=0xFFF4F5FB;
  private static final String[][] TOPICS={
    {"1. Primeros pasos", """
@@ -181,7 +181,6 @@ public final class HelpActivity extends Activity {
      if(saved!=null)System.arraycopy(saved,0,expanded,0,Math.min(saved.length,expanded.length));
    }
    ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(BG);scroll.setFillViewport(true);
-   scroll.setFitsSystemWindows(true);
    LinearLayout root=new LinearLayout(this);root.setOrientation(1);
    root.setPadding(dp(18),dp(18),dp(18),dp(30));root.setFocusableInTouchMode(true);
    scroll.addView(root);setContentView(scroll);root.requestFocus();

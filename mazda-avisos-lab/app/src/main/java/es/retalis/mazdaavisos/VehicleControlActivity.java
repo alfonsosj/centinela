@@ -23,7 +23,7 @@ import javax.crypto.Cipher;
 import javax.net.ssl.HttpsURLConnection;
 
 /** Bloqueo/desbloqueo autorizado con PIN y confirmación explícita. */
-public final class VehicleControlActivity extends Activity {
+public final class VehicleControlActivity extends SafeAreaActivity {
  static final String EXTRA_ACTION="desired_control";
  static final String LOCK="lock",UNLOCK="unlock",
    WINDOWS_OPEN="windows_open",WINDOWS_CLOSE="windows_close",

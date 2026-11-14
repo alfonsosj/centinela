@@ -38,7 +38,7 @@ import javax.net.ssl.HttpsURLConnection;
  * Comprobación de autorización MQTT en servidores oficiales Mazda Europa.
  * No se conecta al broker MQTT. No publica, controla el vehículo, ni almacena tokens.
  */
-public class ConnectionTestActivity extends Activity {
+public class ConnectionTestActivity extends SafeAreaActivity {
  private static final String EU="https://cma-m.iov.changanauto.com.de/cma-app-gw";
  private static final String CA="https://ca-m.iov.changanauto.com.de";
  // Clave pública RSA 2048 del servicio de autenticación, publicada por la integración comunitaria.

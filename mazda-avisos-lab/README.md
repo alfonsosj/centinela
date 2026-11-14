@@ -1,5 +1,12 @@
 # Mazda Avisos Lab
 
+## 1.1.8 — Contenido visible junto a las barras de Android
+
+- Las nueve pantallas de la app comparten un contenedor que reserva el espacio real de la barra de estado, la navegación por botones o gestos y el recorte de cámara.
+- Los márgenes se recalculan según los insets de Android, también al girar y al mostrar el teclado. No se añaden alturas fijas ni se acumula espacio al reconstruir la portada.
+- Se conservan los márgenes de diseño de cada pantalla y se evita aplicar dos veces los de sistema en Notificaciones y Ayuda.
+- `versionCode 31`, misma firma estable para actualizar conservando datos.
+
 ## 1.1.7 — Notificaciones y Ayuda desde los ajustes
 
 - Dos apartados nuevos en los ajustes de avisos: acceso a Notificaciones y Ayuda.
