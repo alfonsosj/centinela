@@ -145,18 +145,62 @@ public final class MainActivity extends Activity {
    panel.addView(value,numberParam);
    label(panel,foot,12,MUTED,false);
  }
+ private void choose(String title,String description,String[] labels,String[] actions){
+   new AlertDialog.Builder(this).setTitle(title).setMessage(description)
+     .setItems(labels,(d,index)->{
+       if(index>=0&&index<actions.length&&actions[index]!=null)
+         remote(actions[index]);
+     }).setNegativeButton("Cerrar",null).show();
+ }
  private void vehicleDetail(VehicleSnapshot v,String which){
-   if(which.equals("windows"))explainState("Ventanillas",
-     "Estado: "+v.windowText()+".\n\n"+
-     (v.stale()?"La lectura tiene más de 20 minutos. Actualiza los datos antes de interpretarla.":"Estado recibido de Mazda.")+
-     "\n\nEl control remoto de ventanillas sigue sin validarse en tu CX-6e.");
-   if(which.equals("trunk"))explainState("Maletero",
-     "Estado: "+v.trunkText()+".\n\n"+
-     (v.stale()?"Lectura antigua. Verifica en Mazda.":"Estado recibido de Mazda.")+
-     "\n\nLa apertura o cierre remotos aún no se han validado.");
-   if(which.equals("climate"))explainState("Climatización",
-     "Estado: "+v.climateText()+".\nTemperatura interior: "+v.tempText()+
-     ".\n\nEl control remoto todavía está pendiente de comprobar.");
+   boolean fresh=!v.stale();
+   if(which.equals("windows")){
+     if(!fresh){
+       explainState("Ventanas · datos antiguos","Consulta primero el estado reciente desde la cuenta Mazda. No se habilitan controles físicos con información desactualizada.");
+       return;
+     }
+     choose("Ventanillas · Experimental",
+       "Estado: "+v.windowText()+". Estos comandos pueden mover las cuatro ventanillas. Comprueba visualmente que no haya obstáculos, personas o animales. Mazda puede rechazarlos si el coche no admite la función.",
+       new String[]{"Cerrar todas las ventanillas","Abrir todas las ventanillas"},
+       new String[]{VehicleControlActivity.WINDOWS_CLOSE,VehicleControlActivity.WINDOWS_OPEN});
+   }else if(which.equals("trunk")){
+     if(!fresh||v.trunk<0){
+       explainState("Maletero · estado no confirmado","Actualiza primero el vehículo para evitar una orden basada en datos antiguos.");
+       return;
+     }
+     choose("Portón · Experimental","Estado: "+v.trunkText()+". Comprueba que el portón tiene espacio y no hay nadie cerca. Se solicitarán PIN y confirmación.",
+       new String[]{"Abrir portón","Cerrar portón"},
+       new String[]{VehicleControlActivity.TRUNK_OPEN,VehicleControlActivity.TRUNK_CLOSE});
+   }else if(which.equals("climate")){
+     choose("Climatización · Experimental",
+       "Estado leído: "+v.climateText()+". Temperatura interior: "+v.tempText()+". Las órdenes requieren confirmación, pueden consumir batería y el coche puede rechazarlas.",
+       new String[]{"Activar climatización y ajustar temperatura","Desactivar climatización","Desempañar parabrisas","Desactivar desempañado"},
+       new String[]{VehicleControlActivity.CLIMATE_ON,VehicleControlActivity.CLIMATE_OFF,
+         VehicleControlActivity.DEFROST_ON,VehicleControlActivity.DEFROST_OFF});
+   }
+ }
+ private void extras(){
+   String[] options={
+     "Localizar coche (luces y sonido)",
+     "Hacer sonar bocina",
+     "Calefacción volante: encender",
+     "Calefacción volante: apagar",
+     "Calefacción asiento conductor",
+     "Calefacción asiento acompañante",
+     "Ventilación asiento conductor",
+     "Ventilación asiento acompañante",
+     "Ajustar límite de carga (60–100 %)"
+   };
+   String[] codes={
+     VehicleControlActivity.FIND,VehicleControlActivity.HORN,
+     VehicleControlActivity.WHEEL_ON,VehicleControlActivity.WHEEL_OFF,
+     VehicleControlActivity.DRIVER_HEAT,VehicleControlActivity.PASSENGER_HEAT,
+     VehicleControlActivity.DRIVER_VENT,VehicleControlActivity.PASSENGER_VENT,
+     VehicleControlActivity.CHARGE_LIMIT
+   };
+   choose("Controles adicionales · Experimentales",
+     "El coche puede no disponer de todas estas opciones. Cada acción se envía solo después de tu confirmación. Comprueba el resultado real; aceptar una orden no garantiza que el equipo cambie de estado.",
+     options,codes);
  }
  void render(){
    ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
@@ -230,6 +274,11 @@ public final class MainActivity extends Activity {
    label(statusCard,"◉  Centinela y avisos",14,INK,true);
    rowAction(statusCard,"Personalizar notificaciones",()->startActivity(new Intent(this,AlertSettingsActivity.class)));
 
+   LinearLayout remoteExtras=card();
+   label(remoteExtras,"Más controles del vehículo",17,INK,true);
+   TextView extraInfo=text("Localizar, bocina, desempañado, volante, asientos y límite de carga. Funciones experimentales sujetas a compatibilidad Mazda.",12,MUTED,false);
+   LinearLayout.LayoutParams xip=new LinearLayout.LayoutParams(-1,-2);xip.topMargin=dp(7);remoteExtras.addView(extraInfo,xip);
+   action(remoteExtras,"Abrir todos los controles",this::extras,false);
    LinearLayout activity=card();
    label(activity,"Actividad reciente",17,INK,true);
    JSONArray events=AlertHistory.read(this);
@@ -275,7 +324,7 @@ public final class MainActivity extends Activity {
      android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
      if(clipboard!=null)clipboard.setPrimaryClip(ClipData.newPlainText("Diagnóstico Mazda",Data.technicalDiagnostic(this)));
    });
-   TextView disclaimer=text("Mazda Avisos Lab v0.18 · Actualización de estado en tiempo real cuando Mazda envía datos. Los controles de ventanas, maletero y climatización permanecen en modo consulta.",11,MUTED,false);
+   TextView disclaimer=text("Mazda Avisos Lab v0.19 · Controles adicionales experimentales. Las órdenes pueden ser rechazadas o no verificables. No sustituye los avisos oficiales ni es una alarma.",11,MUTED,false);
    disclaimer.setPadding(0,dp(4),0,dp(6));root.addView(disclaimer);
  }
  @Override public void onRequestPermissionsResult(int code,String[] perms,int[] results){
