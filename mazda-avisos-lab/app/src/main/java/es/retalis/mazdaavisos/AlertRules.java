@@ -2,6 +2,7 @@ package es.retalis.mazdaavisos;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.SystemClock;
 import org.json.JSONObject;
 import java.util.HashMap;
 import java.util.Locale;
@@ -18,6 +19,7 @@ final class AlertRules {
  static final String LOCKS="locks", DOORS="doors", WINDOWS="windows", TRUNK="trunk";
  static final String CHARGE="charge", CABLE="cable", SOC="soc", TEMP="temp";
  static final String SENTINEL="sentinel", PARK_DROP="park_drop";
+ static final String PARKED_OPEN_REMINDER="parked_open_reminder";
  static final String LOW_SOC="low_soc", STEP_SOC="step_soc", HIGH_TEMP="high_temp";
  static final String LOW_TEMP="low_temp", DROP_POINTS="drop_points";
  private static final AtomicInteger ID=new AtomicInteger(6100);
@@ -30,6 +32,11 @@ final class AlertRules {
  private boolean parkKnown=false,parked=false;
  private boolean lockKnown=false,locked=false;
  private long lastBundleAt=0;
+ // Reminders are timed with a monotonic clock, and require fresh event evidence
+ // in this MQTT connection; a reconnection never reuses previous open states.
+ private long parkedObservedAt=0,lockObservedAt=0,reminderStartedAt=0,lastReminderAt=0;
+ private final long[] doorObservedAt=new long[4];
+ private static final long REMINDER_INTERVAL_MS=60_000L;
  private static final String[] DOOR_KEYS={"driverDoor","passengerDoor","leftRearDoor","rightRearDoor"};
  private static final String[] WINDOW_KEYS={"diverWindow","passengerWindow","leftRearWindow","rightRearWindow"};
  private static final String[] POSITIONS={"conductor","acompañante","trasera izquierda","trasera derecha"};
@@ -77,6 +84,9 @@ final class AlertRules {
  private void binary(JSONObject raw,String key,String label,String category,boolean isTrunk){
    Integer code=code(raw,key,0,100);if(code==null)return;
    int now=code==0?0:1;
+   for(int i=0;i<DOOR_KEYS.length;i++){
+     if(DOOR_KEYS[i].equals(key))doorObservedAt[i]=SystemClock.elapsedRealtime();
+   }
    Integer before=update(key,now);
    if(before==null||before==now)return;
    boolean armed=sentinelArmed();
@@ -94,7 +104,7 @@ final class AlertRules {
    Integer lock=code(raw,"driverDoorLock",0,1);
    if(lock!=null){
      Integer prior=update("driverDoorLock",lock);
-     lockKnown=true;locked=lock==0;
+     lockKnown=true;locked=lock==0;lockObservedAt=SystemClock.elapsedRealtime();
      if(prior!=null&&prior.intValue()!=lock.intValue()){
        lockChanges++;
        if(lock==1&&enabled(app,SENTINEL)&&prior==0){
@@ -112,6 +122,7 @@ final class AlertRules {
    charge(raw);
    battery(raw);
    temperature(raw);
+   tickReminder();
  }
  private void windows(JSONObject raw){
    java.util.List<String> opened=new java.util.ArrayList<>();
@@ -177,7 +188,7 @@ final class AlertRules {
      }
    }
    Integer carStatus=code(raw,"carStatus",1,2);
-   if(carStatus!=null){parked=carStatus==2;parkKnown=true;if(!parked)parkedAnchor=null;}
+   if(carStatus!=null){parked=carStatus==2;parkKnown=true;parkedObservedAt=SystemClock.elapsedRealtime();if(!parked)parkedAnchor=null;}
  }
  private void battery(JSONObject raw){
    Double soc=number(raw,"soc",0,100);
@@ -238,6 +249,48 @@ final class AlertRules {
      notifyUser("Temperatura interior baja: "+Math.round(c)+" °C",
        "El sensor del coche está a "+lower+" °C o menos.");
    }
+ }
+
+ /**
+  * Called after a new MQTT broker/app handshake. Last state before a network
+  * interruption must not be reused to trigger repeated open-door reminders.
+  */
+ void onMqttConnected(){
+   parkedObservedAt=0;lockObservedAt=0;
+   java.util.Arrays.fill(doorObservedAt,0);
+   reminderStartedAt=0;lastReminderAt=0;
+   parkKnown=false;lockKnown=false;
+ }
+ /**
+  * Called on the connected socket loop, even without any new MQTT reports.
+  * First reminder follows one continuous minute of parked + open/unlocked.
+  */
+ void tickReminder(){
+   if(!enabled(app,PARKED_OPEN_REMINDER)||parkedObservedAt==0||!parked){
+     reminderStartedAt=0;lastReminderAt=0;return;
+   }
+   boolean unlocked=lockObservedAt>0&&lockKnown&&!locked;
+   java.util.List<String> openDoors=new java.util.ArrayList<>();
+   for(int i=0;i<DOOR_KEYS.length;i++){
+     if(doorObservedAt[i]>0&&Integer.valueOf(1).equals(states.get(DOOR_KEYS[i])))
+       openDoors.add(POSITIONS[i]);
+   }
+   if(!unlocked&&openDoors.isEmpty()){
+     reminderStartedAt=0;lastReminderAt=0;return;
+   }
+   long now=SystemClock.elapsedRealtime();
+   if(reminderStartedAt==0){reminderStartedAt=now;return;}
+   if(now-reminderStartedAt<REMINDER_INTERVAL_MS||
+      lastReminderAt!=0&&now-lastReminderAt<REMINDER_INTERVAL_MS)return;
+   String reason=unlocked?"El vehículo sigue desbloqueado":"";
+   if(!openDoors.isEmpty()){
+     if(!reason.isEmpty())reason+=" y ";
+     reason+=openDoors.size()==1?"puerta "+openDoors.get(0)+" abierta":
+       openDoors.size()+" puertas abiertas ("+String.join(", ",openDoors)+")";
+   }
+   notifyUser("Recordatorio: Mazda aparcado sin asegurar",
+     reason+". Según la última lectura MQTT; comprueba y asegura el coche.");
+   lastReminderAt=now;
  }
  private boolean sentinelArmed(){return enabled(app,SENTINEL)&&lockKnown&&locked&&parkKnown&&parked;}
  int getLockChanges(){return lockChanges;}
