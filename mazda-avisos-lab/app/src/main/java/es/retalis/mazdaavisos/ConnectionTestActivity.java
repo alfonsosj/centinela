@@ -59,17 +59,17 @@ public class ConnectionTestActivity extends Activity {
    }
    ScrollView scroll=new ScrollView(this);
    LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(28,36,28,32);scroll.addView(root);setContentView(scroll);
-   TextView title=new TextView(this);title.setText("PRUEBA MQTT · MAZDA EUROPA");title.setTextSize(21);root.addView(title);
+   TextView title=new TextView(this);title.setText("CONEXIÓN MAZDA EUROPA");title.setTextSize(21);root.addView(title);
    TextView info=new TextView(this);
-   info.setText("Solo cuenta compartida de pruebas. Las credenciales viajan cifradas por HTTPS a Mazda Europa y no se guardan en el dispositivo ni en GitHub. NO introduzcas tu cuenta principal. Esta versión permite una escucha MQTT de dos minutos o un monitor continuo experimental con notificación visible. No usa Home Assistant, no se reinicia sola tras apagar el móvil y no sustituye las alertas de seguridad.");
+   info.setText("Solo cuenta compartida de pruebas. Las credenciales viajan cifradas por HTTPS a Mazda Europa y no se guardan en el dispositivo ni en GitHub. NO introduzcas tu cuenta principal. Al conectar la cuenta secundaria, el monitor MQTT se inicia automáticamente con notificación persistente. No usa Home Assistant, no se reinicia sola tras apagar el móvil y no sustituye las alertas de seguridad.");
    info.setPadding(0,18,0,18);root.addView(info);
    emailField=new EditText(this);emailField.setSingleLine(true);emailField.setHint("Correo cuenta secundaria");emailField.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);root.addView(emailField);
    passwordField=new EditText(this);passwordField.setSingleLine(true);passwordField.setHint("Contraseña de cuenta secundaria");passwordField.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);root.addView(passwordField);
-   loginButton=new Button(this);loginButton.setText("1. Comprobar autorización en Mazda");root.addView(loginButton);loginButton.setOnClickListener(v->startLogin());
+   loginButton=new Button(this);loginButton.setText("Conectar cuenta Mazda");root.addView(loginButton);loginButton.setOnClickListener(v->startLogin());
    codeField=new EditText(this);codeField.setHint("Código recibido por email");codeField.setInputType(InputType.TYPE_CLASS_NUMBER);codeField.setVisibility(View.GONE);root.addView(codeField);
-   verifyButton=new Button(this);verifyButton.setText("2. Verificar dispositivo y consultar MQTT");verifyButton.setVisibility(View.GONE);root.addView(verifyButton);verifyButton.setOnClickListener(v->verify());
+   verifyButton=new Button(this);verifyButton.setText("Verificar dispositivo");verifyButton.setVisibility(View.GONE);root.addView(verifyButton);verifyButton.setOnClickListener(v->verify());
    listenButton=new Button(this);listenButton.setText("Escuchar MQTT durante 2 minutos");listenButton.setVisibility(View.GONE);root.addView(listenButton);listenButton.setOnClickListener(v->listen());
-   sessionButton=new Button(this);sessionButton.setText("Iniciar monitor continuo experimental");sessionButton.setVisibility(View.GONE);root.addView(sessionButton);sessionButton.setOnClickListener(v->startSession());
+   sessionButton=new Button(this);sessionButton.setText("Reiniciar monitor MQTT");sessionButton.setVisibility(View.GONE);root.addView(sessionButton);sessionButton.setOnClickListener(v->startSession());
    status=new TextView(this);status.setText("Sin realizar consultas.");status.setTextIsSelectable(true);status.setPadding(0,24,0,10);root.addView(status);
    Button close=new Button(this);close.setText("Cerrar diagnóstico");root.addView(close);close.setOnClickListener(v->finish());
  }
@@ -134,7 +134,53 @@ public class ConnectionTestActivity extends Activity {
     finally {busy(false);}
    });
  }
+ private static final int NOTIFICATION_REQUEST=73;
+ private String pendingControlAction=null;
+ private boolean loginMqttReady=false;
+ private void finishAuthorizedLogin(String action,boolean mqttReady,String details){
+   pendingControlAction=action;
+   loginMqttReady=mqttReady;
+   if(!mqttReady){
+     say("Cuenta Mazda conectada. No se ha podido iniciar MQTT: "+details+
+       "\nPuedes usar los controles; reconecta para activar los avisos.");
+     if(action!=null&&!action.isEmpty())openRequestedControl(action);
+     return;
+   }
+   if(android.os.Build.VERSION.SDK_INT>=33 &&
+      checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
+     say("Cuenta Mazda conectada. Autoriza las notificaciones para iniciar el monitor MQTT automáticamente.");
+     requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},NOTIFICATION_REQUEST);
+     return;
+   }
+   startMonitorAndContinue();
+ }
+ private void startMonitorAndContinue(){
+   String action=pendingControlAction;
+   boolean started=loginMqttReady&&startSession();
+   pendingControlAction=null;
+   if(action!=null&&!action.isEmpty())openRequestedControl(action);
+   else if(!started)say("La cuenta Mazda está conectada, pero MQTT no pudo iniciarse.");
+ }
+ private void openRequestedControl(String action){
+   boolean inline=getIntent().getBooleanExtra(MainActivity.EXTRA_INLINE_LOGIN,false);
+   Intent next=inline?new Intent(this,MainActivity.class):new Intent(this,VehicleControlActivity.class);
+   next.putExtra(inline?MainActivity.EXTRA_QUICK_ACTION:VehicleControlActivity.EXTRA_ACTION,action);
+   startActivity(next);finish();
+ }
+ @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
+   super.onRequestPermissionsResult(requestCode,permissions,results);
+   if(requestCode!=NOTIFICATION_REQUEST)return;
+   if(results.length>0&&results[0]==android.content.pm.PackageManager.PERMISSION_GRANTED){
+     startMonitorAndContinue();
+   }else{
+     say("Cuenta Mazda conectada, pero Android impide las notificaciones. Activa el permiso y vuelve a conectarte.");
+     String action=pendingControlAction;pendingControlAction=null;
+     if(action!=null&&!action.isEmpty())openRequestedControl(action);
+   }
+ }
  private void checkMqtt(){
+   String action=getIntent().getStringExtra(VehicleControlActivity.EXTRA_ACTION);
+   boolean sessionCreated=false;
    try{
      JSONObject response=post(EU+"/cma-app-user/api/vehicle/vehicles",new JSONObject(),false);
      JSONArray vehicles=response.optJSONArray("data");
@@ -142,78 +188,69 @@ public class ConnectionTestActivity extends Activity {
        response=post(EU+"/cma-app-user/api/car/vehicles",new JSONObject(),false);
        vehicles=response.optJSONArray("data");
      }
-     if(vehicles==null||vehicles.length()==0){
-       say("Sesión válida pero no aparecen vehículos en la API. Comprueba permisos de la cuenta compartida.");
-       token=null;return;
-     }
+     if(vehicles==null||vehicles.length()==0)throw new Exception("La cuenta compartida no tiene vehículos autorizados");
      JSONObject vehicle=vehicles.optJSONObject(0);
      if(vehicle==null)throw new Exception("Listado de vehículos inesperado");
      String carId=vehicle.optString("carId",vehicle.optString("vehicleId",""));
-     if(carId.isEmpty())throw new Exception("El vehículo carece de identificador de consulta");
-     // El inicio de control remoto solo necesita una sesión y un vehículo autorizado.
+     if(carId.isEmpty())throw new Exception("Falta el identificador del vehículo");
      if(controlKey==null||token==null||token.isEmpty())
-       throw new Exception("No se ha podido completar la sesión de control");
+       throw new Exception("No se pudo completar la sesión de control");
      ControlSession.set(token,deviceId,carId,controlKey);
-     controlKey=null;
-     String action=getIntent().getStringExtra(VehicleControlActivity.EXTRA_ACTION);
-     if(action!=null&&!action.isEmpty()){
-       say("Autenticación completada. Abriendo el control seleccionado...");
-       runOnUiThread(()->{
-         boolean inline=getIntent().getBooleanExtra(MainActivity.EXTRA_INLINE_LOGIN,false);
-         Intent next=inline?new Intent(this,MainActivity.class):new Intent(this,VehicleControlActivity.class);
-         next.putExtra(inline?MainActivity.EXTRA_QUICK_ACTION:VehicleControlActivity.EXTRA_ACTION,action);
-         startActivity(next);
-         finish();
-       });
-       return;
-     }
-     JSONObject functions=post(CA+"/user-apigw/vot-connect-conf-center/api/device/appGetCarConfFunc",
-       new JSONObject().put("carId",carId),true);
-     String thu=findThu(functions.opt("data"),0);
-     if(thu==null){
-       say("La cuenta ve "+vehicles.length()+" vehículo(s), pero Mazda no entrega la configuración THU necesaria para MQTT. Puede deberse a permisos de la cuenta compartida.");
-       token=null;return;
-     }
-     JSONObject conf=post(CA+"/user-apigw/vot-connect-conf-center/api/device/getConnConf",
-       new JSONObject().put("deviceType","1").put("deviceId",thu),true);
-     JSONObject mqttAuth=post(CA+"/user-apigw/vot-connect-auth-center/api/auth/getAuthTokenByUserId",
-       new JSONObject(),true);
-     JSONObject cfg=conf.optJSONObject("data");
-     JSONObject auth=mqttAuth.optJSONObject("data");
-     boolean authReady=auth!=null&&!auth.optString("authToken","").isEmpty();
+     sessionCreated=true;controlKey=null;
+
+     boolean mqttReady=false;
+     String mqttError="datos MQTT no disponibles";
      int reports=0,events=0;
-     if(cfg!=null){
+     try{
+       JSONObject functions=post(CA+"/user-apigw/vot-connect-conf-center/api/device/appGetCarConfFunc",
+         new JSONObject().put("carId",carId),true);
+       String thu=findThu(functions.opt("data"),0);
+       if(thu==null)throw new Exception("No se encontró el canal THU");
+       JSONObject conf=post(CA+"/user-apigw/vot-connect-conf-center/api/device/getConnConf",
+         new JSONObject().put("deviceType","1").put("deviceId",thu),true);
+       JSONObject mqttAuth=post(CA+"/user-apigw/vot-connect-auth-center/api/auth/getAuthTokenByUserId",
+         new JSONObject(),true);
+       JSONObject cfg=conf.optJSONObject("data"),auth=mqttAuth.optJSONObject("data");
+       String secret=auth==null?"":auth.optString("authToken","");
+       if(cfg==null||secret.isEmpty())throw new Exception("No se obtuvo la configuración/autorización MQTT");
        JSONArray infos=cfg.optJSONArray("mqttConnectionInfos");
-       if(infos!=null&&infos.length()>0){
-         JSONObject c=infos.optJSONObject(0);
-         JSONArray topics=c==null?null:c.optJSONArray("topicInfos");
-         if(topics!=null)for(int i=0;i<topics.length();i++){
-           JSONObject entry=topics.optJSONObject(i);
+       if(infos!=null)for(int i=0;i<infos.length();i++){
+         JSONObject info=infos.optJSONObject(i);
+         JSONArray topics=info==null?null:info.optJSONArray("topicInfos");
+         if(topics==null)continue;
+         for(int j=0;j<topics.length();j++){
+           JSONObject entry=topics.optJSONObject(j);
            if(entry==null)continue;
-           String kind=entry.optString("msgType","");
-           JSONArray subscriptions=entry.optJSONArray("subTopics");
-           if(subscriptions==null)continue;
-           for(int k=0;k<subscriptions.length();k++){
-             String topic=subscriptions.optString(k,"");
+           JSONArray subs=entry.optJSONArray("subTopics");
+           if(subs==null)continue;
+           for(int k=0;k<subs.length();k++){
+             String topic=subs.optString(k,"");
+             String kind=entry.optString("msgType","");
              if(kind.equals("properties")&&topic.endsWith("/properties/report"))reports++;
              if(kind.equals("events")&&topic.endsWith("/events/up"))events++;
            }
          }
        }
-     }
-     if(authReady && cfg!=null && reports>0){
-       mqttConfig=cfg;mqttSecret=auth.optString("authToken");
-       runOnUiThread(()->{listenButton.setVisibility(View.VISIBLE);sessionButton.setVisibility(View.VISIBLE);});
+       if(reports==0)throw new Exception("No hay temas de estado MQTT");
+       mqttConfig=cfg;mqttSecret=secret;mqttReady=true;
+     }catch(Exception mqttEx){
+       mqttConfig=null;mqttSecret=null;mqttError=safeError(mqttEx);
      }
      String initialInfo=readInitialVehicleStatus(carId);
-      say("PRUEBA TERMINADA\n\nVehículos visibles: "+vehicles.length()+
-       "\nConfiguración THU: disponible"+
-       "\nAutorización MQTT: "+(authReady?"concedida":"no confirmada")+
-       "\nCanales properties/report: "+reports+
-       "\nCanales events/up: "+events+"\n"+initialInfo+
-       "\n\nSi la autorización fue concedida, pulsa «Escuchar MQTT» para una prueba de 2 minutos.");
+     final boolean ready=mqttReady;
+     final String details=mqttError;
+     final int propertyReports=reports;
+     say("Cuenta Mazda autorizada. "+initialInfo+"\nMonitor: "+
+       (ready?"autorizado ("+propertyReports+" canales); iniciando automáticamente.":
+              "no disponible ("+details+")."));
+     runOnUiThread(()->finishAuthorizedLogin(action,ready,details));
+     token=null;encryptedEmail=null;
+   }catch(Exception ex){
      token=null;
-   }catch(Exception ex){token=null;say("Sesión iniciada, pero falló el diagnóstico MQTT: "+safeError(ex));}
+     say("La conexión Mazda ha fallado: "+safeError(ex));
+     if(sessionCreated&&action!=null&&!action.isEmpty())
+       runOnUiThread(()->openRequestedControl(action));
+   }
  }
  private String readInitialVehicleStatus(String carId){
    try{
@@ -234,10 +271,13 @@ public class ConnectionTestActivity extends Activity {
      return "Lectura inicial: no disponible para esta cuenta; MQTT seguirá conectado.";
    }
  }
- private void startSession(){
-   if(mqttConfig==null||mqttSecret==null||mqttSecret.isEmpty()){say("Primero autoriza la cuenta secundaria.");return;}
-   if(android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
-     say("Primero concede permiso de notificaciones en la pantalla principal de Mazda Avisos Lab.");return;
+ private boolean startSession(){
+   if(mqttConfig==null||mqttSecret==null||mqttSecret.isEmpty()){
+     say("No hay autorización MQTT disponible. Vuelve a conectar la cuenta.");return false;
+   }
+   if(android.os.Build.VERSION.SDK_INT>=33 &&
+       checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
+     say("Falta permiso de notificaciones para activar el monitor.");return false;
    }
    Intent intent=new Intent(this,MqttSessionService.class).setAction(MqttSessionService.ACTION_START);
    intent.putExtra(MqttSessionService.EXTRA_CONFIG,mqttConfig.toString());
@@ -246,8 +286,13 @@ public class ConnectionTestActivity extends Activity {
      startForegroundService(intent);
      mqttConfig=null;mqttSecret=null;token=null;encryptedEmail=null;
      listenButton.setEnabled(false);sessionButton.setEnabled(false);
-     say("Monitor MQTT iniciado sin Home Assistant. Deja activa la notificación persistente. Android puede detener el monitor por batería o cerrar el servicio; tras reiniciar el teléfono hay que volver a iniciar sesión.");
-   }catch(RuntimeException err){say("No se pudo iniciar el servicio: "+safeError(err));}
+     listenButton.setVisibility(View.GONE);sessionButton.setVisibility(View.GONE);
+     say("Cuenta Mazda conectada. Arrancando monitor MQTT automáticamente. Espera «En línea» en la pantalla principal.");
+     return true;
+   }catch(RuntimeException err){
+     say("Cuenta conectada, pero Android no pudo iniciar MQTT: "+safeError(err));
+     return false;
+   }
  }
  private void listen(){
    if(mqttConfig==null||mqttSecret==null){say("Primero comprueba la autorización MQTT.");return;}
