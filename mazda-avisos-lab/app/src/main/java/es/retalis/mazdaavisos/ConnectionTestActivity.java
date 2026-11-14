@@ -156,8 +156,8 @@ public class ConnectionTestActivity extends Activity {
      ControlSession.set(token,deviceId,carId,controlKey);
      controlKey=null;
      String action=getIntent().getStringExtra(VehicleControlActivity.EXTRA_ACTION);
-     if(VehicleControlActivity.LOCK.equals(action)||VehicleControlActivity.UNLOCK.equals(action)){
-       say("Autenticación completada. Abriendo la pantalla del PIN...");
+     if(action!=null&&!action.isEmpty()){
+       say("Autenticación completada. Abriendo el control seleccionado...");
        runOnUiThread(()->{
          Intent next=new Intent(this,VehicleControlActivity.class);
          next.putExtra(VehicleControlActivity.EXTRA_ACTION,action);
