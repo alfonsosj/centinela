@@ -32,7 +32,7 @@ public final class VehicleControlActivity extends Activity {
    FIND="find_vehicle",HORN="honk_horn",
    DEFROST_ON="defrost_on",DEFROST_OFF="defrost_off",
    WHEEL_ON="wheel_on",WHEEL_OFF="wheel_off",
-   CHARGE_LIMIT="charge_limit",
+   REFRESH="refresh",CHARGE_LIMIT="charge_limit",
    DRIVER_HEAT="driver_heat",PASSENGER_HEAT="passenger_heat",
    DRIVER_VENT="driver_vent",PASSENGER_VENT="passenger_vent";
  private static final String ROOT="https://cma-m.iov.changanauto.com.de/cma-app-gw";
@@ -55,6 +55,7 @@ public final class VehicleControlActivity extends Activity {
    action=getIntent().getStringExtra(EXTRA_ACTION);
    if(!knownAction(action)){finish();return;}
    show();
+   if(REFRESH.equals(action)&&ControlSession.get()!=null)refresh();
  }
  private static boolean protectedAction(String action){
    return LOCK.equals(action)||UNLOCK.equals(action)||
@@ -62,7 +63,7 @@ public final class VehicleControlActivity extends Activity {
      TRUNK_OPEN.equals(action)||TRUNK_CLOSE.equals(action);
  }
  private static boolean knownAction(String action){
-   return protectedAction(action)||CLIMATE_ON.equals(action)||CLIMATE_OFF.equals(action)||
+   return REFRESH.equals(action)||protectedAction(action)||CLIMATE_ON.equals(action)||CLIMATE_OFF.equals(action)||
      FIND.equals(action)||HORN.equals(action)||
      DEFROST_ON.equals(action)||DEFROST_OFF.equals(action)||
      WHEEL_ON.equals(action)||WHEEL_OFF.equals(action)||CHARGE_LIMIT.equals(action)||
@@ -71,6 +72,7 @@ public final class VehicleControlActivity extends Activity {
  }
  private static String actionName(String action){
    switch(action){
+     case REFRESH: return "Actualizar estado del vehículo";
      case LOCK: return "Bloquear puertas";
      case UNLOCK: return "Desbloquear puertas";
      case WINDOWS_OPEN: return "Abrir ventanillas";
@@ -164,14 +166,39 @@ public final class VehicleControlActivity extends Activity {
        });card.addView(slider);
      }
      sendButton=new Button(this);
-     sendButton.setText("Solicitar: "+actionName(action));
+     sendButton.setText(REFRESH.equals(action)?"Actualizar ahora":"Solicitar: "+actionName(action));
      card.addView(sendButton);
-     sendButton.setOnClickListener(v->confirm());
-     TextView status=text("La respuesta de Mazda se verificará antes de indicar el resultado. No se mostrará un cierre confirmado sin una lectura posterior del vehículo.",12,false);
+     sendButton.setOnClickListener(v->{if(REFRESH.equals(action))refresh();else confirm();});
+     TextView status=text(REFRESH.equals(action)?
+       "Consulta de solo lectura. No activa ninguna función del coche.":
+       "Tras cada orden se intenta verificar el estado real. Si falta confirmación, se indica expresamente.",12,false);
      status.setPadding(0,dp(12),0,0);card.addView(status);
    }
    Button back=new Button(this);back.setText("Volver al vehículo");root.addView(back);
    back.setOnClickListener(v->finish());
+ }
+ private void refresh(){
+   if(busy)return;
+   ControlSession.State session=ControlSession.get();
+   if(session==null){say("La sesión de control ha caducado. Inicia sesión otra vez.");return;}
+   busy=true;
+   if(sendButton!=null)sendButton.setEnabled(false);
+   say("Consultando el estado del vehículo en Mazda Europa…");
+   worker.execute(()->{
+     try{
+       JSONObject response=post(session,"/cma-app-car-condition/api/vehicle/condition/v2",
+         allStatusRequest(session.vehicleId));
+       JSONObject status=response.optJSONObject("data");
+       if(status==null||!VehicleSnapshot.observeApi(this,status)){
+         say("Mazda respondió, pero no hay indicadores reconocidos en esta lectura.");
+       }else{
+         VehicleSnapshot v=VehicleSnapshot.read(this);
+         say("Actualizado: "+v.doorText()+" · "+v.socText()+
+           " de batería · "+v.tempText()+" interior · "+v.rangeText()+".");
+       }
+     }catch(Exception e){say("No se pudo actualizar: "+safeError(e));}
+     finally{runOnUiThread(()->{busy=false;if(sendButton!=null)sendButton.setEnabled(true);});}
+   });
  }
  private void confirm(){
    if(busy)return;
@@ -209,9 +236,15 @@ public final class VehicleControlActivity extends Activity {
        busy=true;sendButton.setEnabled(false);
        say("Autorizando con Mazda…");
        worker.execute(()->{
-         try{DoorResult res=isDoors?execute(session,pin,unlock):executeAdvanced(session,pin,action,temp,limit,level);
+         try{
+           DoorResult res=isDoors?execute(session,pin,unlock):executeAdvanced(session,pin,action,temp,limit,level);
            say(res.message);
-         }catch(Exception e){say("No se ha podido confirmar la orden: "+safeError(e));}
+           AlertHistory.add(this,"Control: "+actionName(action),res.message);
+         }catch(Exception e){
+           String message="No se ha podido confirmar la orden: "+safeError(e);
+           say(message);
+           AlertHistory.add(this,"Control: "+actionName(action),message);
+         }
          finally{runOnUiThread(()->{busy=false;if(sendButton!=null)sendButton.setEnabled(true);});}
        });
      }).show();
