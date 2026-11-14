@@ -179,6 +179,15 @@ public final class VehicleControlActivity extends Activity {
    String pin=needsPin&&pinInput!=null?pinInput.getText().toString():"";
    if(pinInput!=null)pinInput.setText("");
    if(needsPin&&!pin.matches("[0-9]{6}")){say("El PIN debe tener exactamente 6 cifras.");return;}
+   boolean movesHardware=WINDOWS_OPEN.equals(action)||WINDOWS_CLOSE.equals(action)||
+     TRUNK_OPEN.equals(action)||TRUNK_CLOSE.equals(action);
+   if(movesHardware){
+     VehicleSnapshot vehicle=VehicleSnapshot.read(this);
+     if(vehicle.stale()||vehicle.parked!=1){
+       say("Para mover ventanillas o portón es necesario que Mazda confirme recientemente que el coche está aparcado. Actualiza el estado y vuelve a probar.");
+       return;
+     }
+   }
    ControlSession.State session=ControlSession.get();
    if(session==null){say("La sesión de control ha caducado. Inicia sesión otra vez.");return;}
    boolean unlock=UNLOCK.equals(action);
