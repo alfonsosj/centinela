@@ -32,7 +32,13 @@ public final class VehicleStateIconView extends View {
    switch(kind){
     case LOCK:
       canvas.drawRoundRect(new RectF(10,22,38,41),4,4,p);
-      canvas.drawArc(new RectF(16,7,32,32),180,180,false,p);
+      if(ink==Color.WHITE){
+        // Purple means unlocked: illustrate the shackle visibly open to the right.
+        canvas.drawArc(new RectF(20,7,36,31),170,185,false,p);
+        line(canvas,20,19,20,22);
+      }else{
+        canvas.drawArc(new RectF(16,7,32,32),180,180,false,p);
+      }
       line(canvas,24,30,24,34);
       break;
     case WINDOWS:
