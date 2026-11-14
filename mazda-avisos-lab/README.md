@@ -71,3 +71,31 @@ permisos y la validez temporal de la autorización; su estado debe comprobarse.
 
 **Firma**: mantenida mediante secreto privado de GitHub Actions. versionCode 20
 permite actualizar v0.18/v0.19 firmadas con la misma clave sin reinstalar.
+
+
+## Mazda Avisos 1.0.0 — monitorización estable y diagnóstico
+
+La versión 1.0.0 mantiene los controles remotos verificados por el usuario (bloqueo,
+ventanas, maletero, clima y demás funciones de su vehículo) sin modificar sus
+comandos. Introduce una máquina de estados de MQTT que distingue **conectado**,
+**reconectando**, **sin confirmación**, **detenido** y **requiere volver a iniciar sesión**.
+
+- El servicio mantiene los reintentos con retroceso progresivo mientras Android
+  lo permite. Tras tres fallos consecutivos, envía una alerta local de pérdida
+  de conexión; cuando el monitor recupera MQTT, avisa de la reconexión.
+- Si se interrumpe el servicio, indica que debe autenticarse de nuevo.
+- Tras reiniciar el teléfono o actualizar la app, el receiver comprueba si el
+  usuario había solicitado monitorización y muestra recordatorio de reactivación.
+- No hay claves de acceso, PIN, tokens ni contraseña guardados para reanudar
+  automáticamente tras reinicio o caducidad de la sesión.
+- La interfaz diferencia una conexión actual comprobada de intentos de reconexión.
+
+**Limitación consciente**: sin almacenar credenciales no es posible restaurar
+una conexión que haya perdido sus tokens de sesión. Android puede interrumpir
+servicios en primer plano, y la recepción de alertas no está garantizada 24/7.
+Las notificaciones de ocupantes detectadas en Centro de Mensajes no tienen
+correspondencia MQTT comprobada. No se usa Home Assistant.
+
+Firma release permanente; `versionCode 22` instala sobre las versiones previas
+con la misma firma. El control remoto conserva la confirmación y el PIN por acción
+cuando correspondan.
