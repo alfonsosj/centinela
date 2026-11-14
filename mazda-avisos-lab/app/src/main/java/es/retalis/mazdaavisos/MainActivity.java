@@ -324,6 +324,21 @@ public final class MainActivity extends Activity {
    },false);
    rowAction(tools,"Actualizar pantalla",this::render);
    rowAction(tools,"Detalles de conexión",()->explainState("Estado MQTT",state+"\n\n"+v.age()));
+   rowAction(tools,"Compatibilidad de controles",()->explainState("Funciones y límites",
+     "COMPROBADO EN TU CX-6e\n"+
+     "• Lecturas de batería, temperatura, autonomía y cierre.\n"+
+     "• Avisos MQTT de bloqueo y desbloqueo.\n"+
+     "• Bloquear y desbloquear mediante la cuenta secundaria.\n\n"+
+     "IMPLEMENTADO Y PENDIENTE DE VALIDACIÓN\n"+
+     "• Ventanillas y portón.\n"+
+     "• Clima y desempañado.\n"+
+     "• Bocina, localización, volante y asientos.\n"+
+     "• Límite de carga.\n\n"+
+     "NO DISPONIBLE / NO VERIFICADO\n"+
+     "• Iniciar o detener la carga desde la nube.\n"+
+     "• Vídeo, cámara Centinela y eventos de ocupantes.\n"+
+     "• Reinicio del monitor tras apagar el teléfono sin volver a iniciar sesión.\n\n"+
+     "La API de Mazda puede cambiar. Los avisos experimentales no son una alarma de seguridad."));
    rowAction(tools,"Centro de Mensajes Mazda",()->launchMazda(true));
    rowAction(tools,"Abrir Mazda oficial",()->launchMazda(false));
    rowAction(tools,"Configurar accesibilidad",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
