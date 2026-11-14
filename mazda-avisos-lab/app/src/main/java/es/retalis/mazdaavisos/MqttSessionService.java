@@ -26,6 +26,9 @@ public final class MqttSessionService extends Service {
  private static final int NOTIFY_ID=7901;
  private static final int MQTT_RECONNECT_CYCLE_SECONDS=4*60*60;
  private static final String PREF="mqtt_status";
+ private static final String HEALTH_CHANNEL="mazda_monitor_health";
+ private static final int HEALTH_ID=7903;
+ private boolean problemNotified=false;
  private final AtomicBoolean running=new AtomicBoolean(false);
  private final ExecutorService worker=Executors.newSingleThreadExecutor();
  private final Object changeLock=new Object();
@@ -41,26 +44,38 @@ public final class MqttSessionService extends Service {
 
  public static String currentStatus(Context context){
    android.content.SharedPreferences p=context.getSharedPreferences(PREF,MODE_PRIVATE);
-   String last=p.getString("status","Sin sesión iniciada.");
+   String last=p.getString("status","Monitor todavía no iniciado.");
+   String phase=p.getString("phase","stopped");
    long at=p.getLong("updated_at",0);
-   boolean active=p.getBoolean("active",false);
-   if(at==0)return last;
-   long age=Math.max(0,System.currentTimeMillis()-at);
-   String ageText=age<60000?"hace "+Math.max(1,age/1000)+" s":"hace "+(age/60000)+" min";
-   String time=new SimpleDateFormat("dd/MM HH:mm",Locale.getDefault()).format(new Date(at));
-   if(active&&age>90000){
-     return "SIN CONFIRMACIÓN de conexión desde "+ageText+
-       ". El servicio puede haberse detenido. Última señal "+time+". "+last;
-   }
-   return (active?"Sesión activa (":"Última sesión (")+ageText+"): "+last;
+   long age=at==0?Long.MAX_VALUE:Math.max(0,System.currentTimeMillis()-at);
+   boolean requested=p.getBoolean("wants_monitor",false);
+   if("connected".equals(phase)&&age<=90000)return "MQTT conectado · "+last;
+   if("connected".equals(phase)||"connecting".equals(phase)&&age>90000)
+     return "SIN CONFIRMACIÓN de conexión. "+last;
+   if("connecting".equals(phase)||"retrying".equals(phase))return "Reconectando MQTT · "+last;
+   if("login_needed".equals(phase)||requested&&!"stopped".equals(phase))
+     return "Monitor detenido. Autentica la cuenta secundaria para volver a recibir avisos. "+last;
+   return "Monitor desconectado · "+last;
  }
- private void state(String value,boolean active){
+ private void showHealth(String title,String body){
+   if(android.os.Build.VERSION.SDK_INT>=33 &&
+     checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)return;
+   NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+   if(nm==null)return;
+   if(android.os.Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(
+     new NotificationChannel(HEALTH_CHANNEL,"Estado del monitor Mazda",NotificationManager.IMPORTANCE_DEFAULT));
+   PendingIntent open=PendingIntent.getActivity(this,HEALTH_ID,new Intent(this,MainActivity.class),
+     PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+   nm.notify(HEALTH_ID,new Notification.Builder(this,HEALTH_CHANNEL)
+     .setSmallIcon(android.R.drawable.stat_notify_error).setContentTitle(title).setContentText(body)
+     .setStyle(new Notification.BigTextStyle().bigText(body))
+     .setContentIntent(open).setAutoCancel(true).build());
+ }
+ private void setState(String value,String phase,boolean active){
    getSharedPreferences(PREF,MODE_PRIVATE).edit()
-     .putString("status",value)
-     .putBoolean("active",active)
-     .putLong("updated_at",System.currentTimeMillis())
-     .putInt("reconnects",reconnects)
-     .apply();
+     .putString("status",value).putString("phase",phase)
+     .putBoolean("active",active).putLong("updated_at",System.currentTimeMillis())
+     .putInt("reconnects",reconnects).apply();
    if(!active)return;
    long time=SystemClock.elapsedRealtime();
    if(time-lastNotify>=15000){
@@ -68,6 +83,14 @@ public final class MqttSessionService extends Service {
      NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
      if(nm!=null)nm.notify(NOTIFY_ID,notification(value.replace('\n',' ')));
    }
+ }
+ private void state(String value,boolean active){
+   boolean connected=active&&value.contains("MQTT conectado");
+   if(connected&&problemNotified){
+     showHealth("Mazda Avisos reconectado","Se ha recuperado la conexión MQTT.");
+     problemNotified=false;
+   }
+   setState(value,active?(connected?"connected":"connecting"):"stopped",active);
  }
  private void wake(){
    synchronized(changeLock){changeLock.notifyAll();}
@@ -139,7 +162,10 @@ public final class MqttSessionService extends Service {
  }
  @Override public int onStartCommand(Intent intent,int flags,int startId){
    String action=intent==null?null:intent.getAction();
-   if(ACTION_STOP.equals(action)){shutdown("Monitor detenido por el usuario.");return START_NOT_STICKY;}
+   if(ACTION_STOP.equals(action)){
+     getSharedPreferences(PREF,MODE_PRIVATE).edit().putBoolean("wants_monitor",false).apply();
+     shutdown("Monitor detenido por el usuario.");return START_NOT_STICKY;
+   }
    if(!ACTION_START.equals(action))return START_NOT_STICKY;
    if(!running.compareAndSet(false,true))return START_NOT_STICKY;
    String config=intent.getStringExtra(EXTRA_CONFIG);
@@ -147,7 +173,8 @@ public final class MqttSessionService extends Service {
    if(config==null||auth==null||auth.isEmpty()){shutdown("Falta autorización MQTT.");return START_NOT_STICKY;}
    try{startForeground(NOTIFY_ID,notification("Conectando con Mazda · monitor continuo experimental"));}
    catch(RuntimeException e){shutdown("Android rechazó iniciar el monitor.");return START_NOT_STICKY;}
-   quit=false;
+   quit=false;problemNotified=false;reconnects=0;
+   getSharedPreferences(PREF,MODE_PRIVATE).edit().putBoolean("wants_monitor",true).apply();
    state("Iniciando escucha MQTT",true);
    worker.execute(()->work(config,auth));
    return START_NOT_STICKY;
@@ -172,7 +199,7 @@ public final class MqttSessionService extends Service {
      int failures=0;
      while(!quit){
        if(!online()){
-         state("Sin conexión de red. Esperando Wi-Fi o datos móviles...",true);
+         setState("Sin conexión de red. Esperando Wi-Fi o datos móviles...","retrying",true);
          delay(10000);
          continue;
        }
@@ -188,14 +215,19 @@ public final class MqttSessionService extends Service {
          if(quit)break;
          if(networkChanged){
            failures=0;
-           state("Cambio de red detectado. Reconectando...",true);
+           setState("Cambio de red detectado. Reconectando...","retrying",true);
          }else{
            failures++;
            reconnects++;
            // No exponer textos de excepciones: pueden contener datos del servidor.
            String kind=e instanceof java.net.SocketTimeoutException?"Tiempo de espera":
              e instanceof java.io.IOException?"Conexión interrumpida":"Fallo de sesión MQTT";
-           state(kind+". Reintento "+reconnects+" ("+networkLabel()+")",true);
+           setState(kind+". Reintento "+reconnects+" ("+networkLabel()+")","retrying",true);
+            if(failures>=3&&!problemNotified){
+              problemNotified=true;
+              showHealth("Mazda Avisos sin conexión",
+                "El monitor lleva varios reintentos. Sigue intentando conectar mientras esté activo.");
+            }
          }
        }finally{
          MqttProbe p=probe;probe=null;
@@ -211,7 +243,11 @@ public final class MqttSessionService extends Service {
    finally{
      quit=true;
      running.set(false);
-     state(finishReason,false);
+     if(getSharedPreferences(PREF,MODE_PRIVATE).getBoolean("wants_monitor",false)){
+       setState(finishReason,"login_needed",false);
+       if(!problemNotified)showHealth("Mazda Avisos detenido",
+         "Abre Mazda Avisos y vuelve a autenticar la cuenta secundaria para recibir notificaciones.");
+     }else state(finishReason,false);
      stopForeground(STOP_FOREGROUND_REMOVE);
      stopSelf();
    }
@@ -235,7 +271,11 @@ public final class MqttSessionService extends Service {
      try{connectivity.unregisterNetworkCallback(networkCallback);}catch(RuntimeException ignored){}
    }
    worker.shutdownNow();
-   if(running.get())state("Servicio finalizado por Android o cierre de la aplicación.",false);
+   if(running.get()&&getSharedPreferences(PREF,MODE_PRIVATE).getBoolean("wants_monitor",false)){
+     setState("Servicio terminado por Android o cierre de la aplicación.","login_needed",false);
+     if(!problemNotified)showHealth("Monitor Mazda interrumpido",
+       "Abre Mazda Avisos y vuelve a autenticar la cuenta secundaria.");
+   }
    super.onDestroy();
  }
  @Override public IBinder onBind(Intent intent){return null;}
