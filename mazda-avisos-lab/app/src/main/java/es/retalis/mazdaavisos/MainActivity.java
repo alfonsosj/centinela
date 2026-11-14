@@ -207,7 +207,8 @@ public final class MainActivity extends Activity {
    root=vertical();root.setPadding(dp(18),dp(20),dp(18),dp(30));scroll.addView(root);setContentView(scroll);
    VehicleSnapshot v=VehicleSnapshot.read(this);
    String state=MqttSessionService.currentStatus(this);
-   boolean connected=state.contains("MQTT conectado")&&!state.contains("SIN CONFIRMACIÓN")&&!state.contains("Última sesión");
+   boolean connected=state.startsWith("MQTT conectado");
+   boolean reconnecting=state.startsWith("Reconectando")||state.startsWith("SIN CONFIRMACIÓN");
 
    LinearLayout head=horizontal();
    TextView app=text("MAZDA AVISOS",21,INK,true);head.addView(app,new LinearLayout.LayoutParams(0,-2,1));
@@ -220,7 +221,7 @@ public final class MainActivity extends Activity {
    LinearLayout hero=card();
    LinearLayout line=horizontal();
    label(line,"CX-6e Aero Grey",19,INK,true);
-   TextView live=text(connected?" ●  En línea":" ○  Sin conexión",12,connected?GREEN:MUTED,true);
+   TextView live=text(connected?" ●  En línea":reconnecting?" ◌  Reconectando":" ○  Sin conexión",12,connected?GREEN:MUTED,true);
    LinearLayout.LayoutParams liveP=new LinearLayout.LayoutParams(-2,-2);liveP.leftMargin=dp(10);line.addView(live,liveP);
    hero.addView(line);
    TextView freshness=text(v.age()+(v.stale()&&v.lastDataAt>0?" · no actualizado":""),12,v.stale()?MUTED:GREEN,false);
@@ -319,11 +320,12 @@ public final class MainActivity extends Activity {
      tools.setVisibility(toolsOpen?View.VISIBLE:View.GONE);
      reveal.setText("Conexión y herramientas   "+(toolsOpen?"▴":"▾"));
    });
-   TextView connectionText=text(connected?"MQTT conectado. Los avisos llegan directamente a tu móvil.":
-     "Monitor desconectado. Para recibir avisos, conecta la cuenta secundaria.",13,MUTED,false);
+   TextView connectionText=text(connected?"Conexión MQTT activa. Los avisos dependen del servicio, la red y los mensajes de Mazda.":
+     reconnecting?"Se ha perdido la conexión; el monitor está intentando recuperarla.":
+     "Monitor desconectado. Abre «Conectar / autenticar Mazda» para volver a recibir avisos.",13,MUTED,false);
    LinearLayout.LayoutParams conP=new LinearLayout.LayoutParams(-1,-2);conP.topMargin=dp(11);tools.addView(connectionText,conP);
    action(tools,"Conectar / autenticar Mazda",()->startActivity(new Intent(this,ConnectionTestActivity.class)),true);
-   if(connected)action(tools,"Detener monitor",()->{
+   if(connected||reconnecting)action(tools,"Detener monitor",()->{
      startService(new Intent(this,MqttSessionService.class).setAction(MqttSessionService.ACTION_STOP));render();
    },false);
    rowAction(tools,"Actualizar pantalla",this::render);
