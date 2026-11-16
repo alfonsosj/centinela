@@ -235,7 +235,9 @@ public final class VehicleControlActivity extends SafeAreaActivity {
        busy=true;sendButton.setEnabled(false);
        say("Autorizando con Mazda…");
        worker.execute(()->{
+         boolean commandHeld=false;
          try{
+           ControlCommandGate.GLOBAL.beginManual();commandHeld=true;
            DoorResult res=isDoors?execute(session,pin,unlock):executeAdvanced(session,pin,action,temp,limit,level);
            say(res.message);
            AlertHistory.add(this,"Control: "+actionName(action),res.message);
@@ -244,7 +246,7 @@ public final class VehicleControlActivity extends SafeAreaActivity {
            say(message);
            AlertHistory.add(this,"Control: "+actionName(action),message);
          }
-         finally{runOnUiThread(()->{busy=false;if(sendButton!=null)sendButton.setEnabled(true);});}
+         finally{if(commandHeld)ControlCommandGate.GLOBAL.endManual();runOnUiThread(()->{busy=false;if(sendButton!=null)sendButton.setEnabled(true);});}
        });
      }).show();
  }

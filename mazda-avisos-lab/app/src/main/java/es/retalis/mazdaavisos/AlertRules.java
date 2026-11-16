@@ -20,11 +20,15 @@ final class AlertRules {
  static final String CHARGE="charge", CABLE="cable", SOC="soc", TEMP="temp";
  static final String SENTINEL="sentinel", PARK_DROP="park_drop";
  static final String PARKED_OPEN_REMINDER="parked_open_reminder";
+ static final String AUTO_LOCK="auto_lock_after_minute";
  static final String LOCKED_WINDOW_REMINDER="locked_window_reminder";
  static final String LOW_SOC="low_soc", STEP_SOC="step_soc", HIGH_TEMP="high_temp";
  static final String LOW_TEMP="low_temp", DROP_POINTS="drop_points";
  private static final AtomicInteger ID=new AtomicInteger(6100);
  private final Context app;
+ private final WindowAlertFilter windowFilter=new WindowAlertFilter();
+ private final AutoLockPolicy autoLockPolicy=new AutoLockPolicy();
+ private final AutomaticLockController autoLock;
  private final Map<String,Integer> states=new HashMap<>();
  private Double lastSoc=null, lastTemp=null, socStepAnchor=null, parkedAnchor=null;
  private boolean highTriggered=false,lowTriggered=false;
@@ -46,11 +50,12 @@ final class AlertRules {
  private static final String[] WINDOW_KEYS={"diverWindow","passengerWindow","leftRearWindow","rightRearWindow"};
  private static final String[] POSITIONS={"conductor","acompañante","trasera izquierda","trasera derecha"};
 
- AlertRules(Context context){app=context.getApplicationContext();}
+ AlertRules(Context context){this(context,null);}
+ AlertRules(Context context,String vehicleId){app=context.getApplicationContext();autoLock=new AutomaticLockController(app,autoLockPolicy,this::onAutomaticLockConfirmed,vehicleId);}
  static SharedPreferences pref(Context c){return c.getSharedPreferences(PREF,Context.MODE_PRIVATE);}
  static boolean enabled(Context c,String key){return pref(c).getBoolean(key,defaultEnabled(key));}
  static boolean defaultEnabled(String key){
-   return LOCKS.equals(key)||WINDOWS.equals(key)||TRUNK.equals(key)||
+   return LOCKS.equals(key)||WINDOWS.equals(key)||TRUNK.equals(key)||AUTO_LOCK.equals(key)||
      CHARGE.equals(key)||CABLE.equals(key)||SOC.equals(key)||TEMP.equals(key);
  }
  static int limit(Context c,String key){
@@ -103,8 +108,9 @@ final class AlertRules {
      notifyUser(label+" "+action,"Cambio recibido por MQTT en el Mazda.");
    }
  }
- void ingest(JSONObject raw){
+ synchronized void ingest(JSONObject raw){
    if(raw==null)return;
+   autoLockPolicy.observe(raw,SystemClock.elapsedRealtime());
    VehicleSnapshot.observe(app,raw);
    Integer lock=code(raw,"driverDoorLock",0,1);
    if(lock!=null){
@@ -130,18 +136,18 @@ final class AlertRules {
    tickReminder();
  }
  private void windows(JSONObject raw){
+   for(int i=0;i<WINDOW_KEYS.length;i++){
+     Integer value=code(raw,WINDOW_KEYS[i],0,100);if(value==null)continue;
+     windowObservedAt[i]=SystemClock.elapsedRealtime();update(WINDOW_KEYS[i],value==0?0:1);
+   }
+   windowFilter.observe(raw,SystemClock.elapsedRealtime());
+ }
+ private void flushWindowAlerts(){
+   WindowAlertFilter.Changes changes=windowFilter.poll(SystemClock.elapsedRealtime());
    java.util.List<String> opened=new java.util.ArrayList<>();
    java.util.List<String> closed=new java.util.ArrayList<>();
-   for(int i=0;i<WINDOW_KEYS.length;i++){
-     Integer v=code(raw,WINDOW_KEYS[i],0,100);
-     if(v==null)continue;
-     windowObservedAt[i]=SystemClock.elapsedRealtime();
-     int now=v==0?0:1;
-     Integer old=update(WINDOW_KEYS[i],now);
-     if(old==null||old==now)continue;
-     if(now==1)opened.add(POSITIONS[i]);
-     else closed.add(POSITIONS[i]);
-   }
+   for(int index:changes.opened)opened.add(POSITIONS[index]);
+   for(int index:changes.closed)closed.add(POSITIONS[index]);
    boolean armed=sentinelArmed();
    if(!opened.isEmpty()&&(armed||enabled(app,WINDOWS))){
      String label=opened.size()==1?"Ventana "+opened.get(0)+" abierta":opened.size()+" ventanas abiertas";
@@ -261,7 +267,8 @@ final class AlertRules {
   * Called after a new MQTT broker/app handshake. Last state before a network
   * interruption must not be reused to trigger repeated open-door reminders.
   */
- void onMqttConnected(){
+ synchronized void onMqttConnected(){
+   windowFilter.reset();autoLockPolicy.connection(true);
    parkedObservedAt=0;lockObservedAt=0;
    java.util.Arrays.fill(doorObservedAt,0);
    java.util.Arrays.fill(windowObservedAt,0);
@@ -269,13 +276,25 @@ final class AlertRules {
    reminderStartedAt=0;lastReminderAt=0;
    parkKnown=false;lockKnown=false;
  }
+ synchronized void onMqttDisconnected(){
+   autoLockPolicy.connection(false);windowFilter.reset();
+   parkedObservedAt=0;lockObservedAt=0;reminderStartedAt=0;lastReminderAt=0;
+   resetLockedWindowReminder();
+ }
+ private synchronized void onAutomaticLockConfirmed(){
+   if(!locked)lockChanges++;
+   states.put("driverDoorLock",0);lockKnown=true;locked=true;lockObservedAt=SystemClock.elapsedRealtime();
+   reminderStartedAt=0;lastReminderAt=0;
+ }
  /**
   * Called on the connected socket loop, even without any new MQTT reports.
   * First reminder follows one continuous minute of parked + open/unlocked.
   */
- void tickReminder(){
+ synchronized void tickReminder(){
+   flushWindowAlerts();
    tickParkedOpenReminder();
    tickLockedWindowReminder();
+   autoLock.tick();
  }
  private void tickParkedOpenReminder(){
    if(!enabled(app,PARKED_OPEN_REMINDER)||parkedObservedAt==0||!parked){
@@ -301,7 +320,7 @@ final class AlertRules {
        openDoors.size()+" puertas abiertas ("+String.join(", ",openDoors)+")";
    }
    notifyUser("Recordatorio: Mazda aparcado sin asegurar",
-     reason+". Según la última lectura MQTT; comprueba y asegura el coche.");
+     reason+". Según la última lectura MQTT; comprueba y asegura el coche. "+autoLockPolicy.waitingReason(now));
    lastReminderAt=now;
  }
  /**
@@ -315,7 +334,7 @@ final class AlertRules {
    }
    java.util.List<String> opened=new java.util.ArrayList<>();
    for(int i=0;i<WINDOW_KEYS.length;i++){
-     if(windowObservedAt[i]>0&&Integer.valueOf(1).equals(states.get(WINDOW_KEYS[i])))
+     if(windowObservedAt[i]>0&&windowFilter.confirmedOpen(i))
        opened.add(POSITIONS[i]);
    }
    if(opened.isEmpty()){resetLockedWindowReminder();return;}
@@ -345,7 +364,7 @@ final class AlertRules {
  int getLockChanges(){return lockChanges;}
  Integer getLastDoorLock(){return states.get("driverDoorLock");}
  void setInitialDoorLock(Integer old){if(old!=null&&(old==0||old==1))states.put("driverDoorLock",old);}
- String summary(){
+ synchronized String summary(){
    return "Avisos generados: "+totalAlerts+
     "\nBatería: "+(lastSoc==null?"sin dato":pct(lastSoc))+
     "\nTemperatura interior: "+(lastTemp==null?"sin dato":Math.round(lastTemp)+" °C")+

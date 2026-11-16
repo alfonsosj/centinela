@@ -22,6 +22,7 @@ public final class MqttSessionService extends Service {
  public static final String ACTION_STOP="es.retalis.mazdaavisos.STOP_MQTT";
  public static final String EXTRA_CONFIG="mqtt_configuration";
  public static final String EXTRA_AUTH="mqtt_credential";
+ public static final String EXTRA_VEHICLE="mqtt_vehicle";
  private static final String NOTIFY_CHANNEL="mazda_mqtt_monitor";
  private static final int NOTIFY_ID=7901;
  private static final int MQTT_RECONNECT_CYCLE_SECONDS=4*60*60;
@@ -171,13 +172,15 @@ public final class MqttSessionService extends Service {
    if(!running.compareAndSet(false,true))return START_NOT_STICKY;
    String config=intent.getStringExtra(EXTRA_CONFIG);
    String auth=intent.getStringExtra(EXTRA_AUTH);
+   String vehicleId=intent.getStringExtra(EXTRA_VEHICLE);
    if(config==null||auth==null||auth.isEmpty()){shutdown("Falta autorización MQTT.");return START_NOT_STICKY;}
    try{startForeground(NOTIFY_ID,notification("Conectando con Mazda · monitor continuo experimental"));}
    catch(RuntimeException e){shutdown("Android rechazó iniciar el monitor.");return START_NOT_STICKY;}
    quit=false;problemNotified=false;reconnects=0;
+   AutomaticLockController.monitorStarted(this,vehicleId);
    getSharedPreferences(PREF,MODE_PRIVATE).edit().putBoolean("wants_monitor",true).apply();
    state("Iniciando escucha MQTT",true);
-   worker.execute(()->work(config,auth));
+   worker.execute(()->work(config,auth,vehicleId));
    return START_NOT_STICKY;
  }
  private void delay(long millis){
@@ -189,11 +192,11 @@ public final class MqttSessionService extends Service {
      }
    }
  }
- private void work(String config,String auth){
+ private void work(String config,String auth,String vehicleId){
    String finishReason="Sesión finalizada.";
    try {
      JSONObject cfg=new JSONObject(config);
-     sharedAlerts=new AlertRules(this);
+     sharedAlerts=new AlertRules(this,vehicleId);
      // Sin límite propio de 90 minutos. El servicio continúa mientras Android lo autorice.
      // Cada 4 h se recrea la sesión MQTT con autorización aún válida; si expira el token
      // se informa de la interrupción, sin guardar contraseñas ni tokens en disco.
@@ -242,6 +245,7 @@ public final class MqttSessionService extends Service {
      if(!quit)finishReason="Monitor finalizado.";
    }catch(Exception e){finishReason="No se pudo continuar la escucha MQTT.";}
    finally{
+     AutomaticLockController.monitorStopped();
      quit=true;
      running.set(false);
      if(getSharedPreferences(PREF,MODE_PRIVATE).getBoolean("wants_monitor",false)){
@@ -254,6 +258,8 @@ public final class MqttSessionService extends Service {
    }
  }
  private void shutdown(String message){
+   AutomaticLockController.monitorStopped();
+   if(sharedAlerts!=null)sharedAlerts.onMqttDisconnected();
    quit=true;
    MqttProbe p=probe;if(p!=null)p.close();
    wake();
@@ -265,6 +271,8 @@ public final class MqttSessionService extends Service {
    shutdown("Tiempo máximo de servicio permitido por Android alcanzado.");
  }
  @Override public void onDestroy(){
+   AutomaticLockController.monitorStopped();
+   if(sharedAlerts!=null)sharedAlerts.onMqttDisconnected();
    quit=true;
    MqttProbe p=probe;if(p!=null)p.close();
    wake();

@@ -50,6 +50,7 @@ public class ConnectionTestActivity extends SafeAreaActivity {
  private MqttProbe probe;
  private JSONObject mqttConfig;
  private String mqttSecret;
+ private String mqttVehicleId;
  private String token=null,encryptedEmail=null,deviceId=null;
  private java.security.PrivateKey controlKey=null;
  private char[] pendingPin=null;
@@ -258,6 +259,7 @@ public class ConnectionTestActivity extends SafeAreaActivity {
        throw new Exception("Mazda no ha autorizado el PIN. Revisa las 6 cifras.");
      ControlSession.set(token,deviceId,carId,controlKey,pendingPin);
      FeatureEvidence.reset();
+     AutomaticLockController.sessionAvailable(this);
      erasePendingPin();
      sessionCreated=true;controlKey=null;
 
@@ -295,7 +297,7 @@ public class ConnectionTestActivity extends SafeAreaActivity {
          }
        }
        if(reports==0)throw new Exception("No hay temas de estado MQTT");
-       mqttConfig=cfg;mqttSecret=secret;mqttReady=true;
+       mqttConfig=cfg;mqttSecret=secret;mqttVehicleId=carId;mqttReady=true;
      }catch(Exception mqttEx){
        mqttConfig=null;mqttSecret=null;mqttError=safeError(mqttEx);
      }
@@ -351,6 +353,7 @@ public class ConnectionTestActivity extends SafeAreaActivity {
    Intent intent=new Intent(this,MqttSessionService.class).setAction(MqttSessionService.ACTION_START);
    intent.putExtra(MqttSessionService.EXTRA_CONFIG,mqttConfig.toString());
    intent.putExtra(MqttSessionService.EXTRA_AUTH,mqttSecret);
+   intent.putExtra(MqttSessionService.EXTRA_VEHICLE,mqttVehicleId);
    try{
      startForegroundService(intent);
      mqttConfig=null;mqttSecret=null;token=null;encryptedEmail=null;

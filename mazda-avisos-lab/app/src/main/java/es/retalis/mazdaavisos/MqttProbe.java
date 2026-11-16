@@ -28,7 +28,7 @@ final class MqttProbe {
  }
  void setInitialDoorLock(Integer value){if(value!=null&&(value==0||value==1))alerts.setInitialDoorLock(value);}
  Integer getLastDoorLock(){return alerts.getLastDoorLock();}
- void close(){stopped=true;try{if(socket!=null)socket.close();}catch(Exception ignored){}}
+ void close(){stopped=true;alerts.onMqttDisconnected();try{if(socket!=null)socket.close();}catch(Exception ignored){}}
  private static String str(byte[] data){return new String(data,StandardCharsets.UTF_8);}
  private static void utf(ByteArrayOutputStream b,String s)throws IOException{
    byte[] data=s.getBytes(StandardCharsets.UTF_8);if(data.length>65535)throw new IOException("Campo MQTT largo");
@@ -208,7 +208,7 @@ final class MqttProbe {
        }
        try{Frame f=read(in);if(f.type()==13)pongDeadline=0;
           if(f.type()==3){Msg m=parse(f);ack(out,m);
-          if(subs.contains(m.topic))handle(m);}
+          if(!stopped&&subs.contains(m.topic))handle(m);}
           if(f.type()==14)throw new IOException("El broker cortó la conexión");
        }catch(java.net.SocketTimeoutException expected){}
        t=SystemClock.elapsedRealtime();
@@ -217,6 +217,6 @@ final class MqttProbe {
        if(t>update){feedback.update(status());update=t+10000;}
      }
      feedback.update("Prueba finalizada\n"+status());
-   }finally{close();}
+   }finally{alerts.onMqttDisconnected();close();}
  }
 }

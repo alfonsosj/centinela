@@ -1,5 +1,16 @@
 # Mazda Avisos Lab
 
+## 1.1.12 — Ventanillas sin marco y cierre automático
+
+- Filtra aperturas breves del cristal al abrir puertas: confirma la apertura tras 10 segundos estables y tras el cierre de la puerta cuando se conoce. Suprime también el cierre de una apertura breve descartada.
+- El recordatorio de coche aparcado sin asegurar puede solicitar además el bloqueo automático, sin diálogo de confirmación. El ajuste de bloqueo está marcado inicialmente y solo actúa si también está activo el recordatorio.
+- Requiere coche aparcado/desbloqueado un minuto, cuatro puertas y maletero cerrados con datos MQTT recientes, 10 segundos de asentamiento, lectura HTTPS previa y autorización de bloqueo válida. Verifica ambas cerraduras; los fallos se notifican sin declarar éxito. Tres intentos por ciclo como máximo, con un minuto entre ellos.
+- Autorización de bloqueo ligada al mismo coche del monitor, solo en RAM mientras está activo; conserva su propia copia del PIN, separada de la caducidad de 15 minutos de los controles manuales. Se elimina al desactivar la función, detener el monitor, cerrar sesión o finalizar el proceso. Depende de que Mazda siga aceptando la sesión.
+- Los controles manuales y automáticos se serializan; una orden manual interrumpe un automático pendiente y lo aplaza un minuto. Una orden ya recibida por Mazda puede estar en curso.
+- No cierra físicamente puertas, ventanillas o maletero ni detecta llaves/ocupantes. No garantiza que el coche quede cerrado siempre.
+- `versionCode 35`, misma firma estable. Pruebas de política, ventanas y protocolo con HTTPS simulado, además de compilación Android.
+
+
 ## 1.1.11 — Investigación de funciones chinas
 
 - La lectura europea añade metadatos de `commandCode` y marcas de disponibilidad sin interpretar un código como prueba de ejecución.

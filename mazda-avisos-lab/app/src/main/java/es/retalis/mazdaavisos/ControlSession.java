@@ -8,6 +8,8 @@ import java.util.Arrays;
  * Sesión de control de Mazda en RAM, con expiración a los 15 minutos.
  * El PIN se borra de memoria al caducar o cerrar la sesión.
  * Nunca se escribe en preferencias, archivos, registros ni GitHub.
+ * AutomaticLockController gestiona por separado la copia de PIN autorizada
+ * únicamente para bloquear mientras el monitor y su ajuste estén activos.
  */
 final class ControlSession {
  static final long TTL_MS=15L*60L*1000L;
@@ -48,6 +50,6 @@ final class ControlSession {
    State active=get();
    return active!=null&&active==session?new String(active.controlPin):null;
  }
- static synchronized void clear(){clearCurrent();}
+ static synchronized void clear(){clearCurrent();AutomaticLockController.sessionCleared();}
  private ControlSession(){}
 }

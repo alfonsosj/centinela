@@ -35,7 +35,7 @@ public final class HelpActivity extends SafeAreaActivity {
 
      «Crear cuenta nueva» y «Recuperar contraseña», en la pantalla de conexión, abren el proceso de Mazda oficial. Si la app oficial no está instalada, se ofrece abrir su ficha en Google Play. Completa allí el registro o la recuperación y vuelve a Mazda Avisos para conectarte. Crear una cuenta no concede por sí solo acceso al vehículo: debes vincularlo o compartirlo desde Mazda.
 
-     El PIN se verifica al autenticar la cuenta. Durante esa sesión de control se reutiliza sin pedirlo para cada función, aunque las órdenes siguen solicitando confirmación. La sesión de control dura como máximo 15 minutos. Si caduca, Android cierra el proceso o detienes el monitor, debes autenticarte de nuevo. Que el monitor siga conectado no prolonga la sesión de los controles.
+     El PIN se verifica al autenticar la cuenta. Durante esa sesión de control se reutiliza sin pedirlo para cada función, aunque las órdenes manuales siguen solicitando confirmación. La sesión de control manual dura como máximo 15 minutos. Si caduca, Android cierra el proceso o detienes el monitor, debes autenticarte de nuevo. Que el monitor siga conectado no prolonga la sesión de los controles manuales. Si activas el recordatorio y el cierre automático, se conserva además una autorización separada, únicamente para bloquear ese mismo vehículo mientras el monitor esté activo. Incluye una copia del PIN solo en memoria, no caduca a los 15 minutos de los controles manuales y sigue dependiendo de que Mazda acepte la sesión. Se borra al desactivar la función, detener el monitor, cerrar la sesión o terminar el proceso.
 
      El PIN y los datos de acceso se mantienen temporalmente en memoria; no se guardan como contraseña o PIN en archivos, preferencias ni historial.
      """},
@@ -73,7 +73,7 @@ public final class HelpActivity extends SafeAreaActivity {
      • Apertura y cierre de las ventanillas.
      • Apertura y cierre del maletero.
 
-     Desbloquear una cerradura y abrir físicamente una puerta son eventos distintos. Si varias ventanillas cambian en el mismo informe, la app agrupa el aviso.
+     Desbloquear una cerradura y abrir físicamente una puerta son eventos distintos. Si varias ventanillas cambian juntas, la app agrupa el aviso. Las puertas sin marco bajan un poco el cristal al abrir: la app filtra las bajadas/subidas breves, espera 10 segundos de apertura estable y, cuando conoce la puerta, 10 segundos después de su cierre. No emite el cierre de una apertura breve que no llegó a confirmar. Los recordatorios de ventanillas usan este mismo filtro.
 
      Los avisos se basan en cambios recibidos por MQTT. La primera lectura establece una referencia y no genera por sí sola un aviso de cambio. Activar una casilla no obliga al coche a enviar datos ni reproduce sucesos anteriores.
      """},
@@ -82,7 +82,9 @@ public final class HelpActivity extends SafeAreaActivity {
 
      «Avisar cada minuto si el coche está bloqueado y alguna ventanilla abierta»: es un ajuste independiente. Tras un minuto con esos estados confirmados, recuerda cerrar las ventanillas. Termina cuando Mazda informa de que se han cerrado o se ha desbloqueado el vehículo.
 
-     Ambos requieren monitor conectado y estados recibidos en la conexión actual. Tras una reconexión esperan nuevas confirmaciones. Si el monitor pierde conexión no pueden continuar de forma fiable. No cierran ni bloquean nada automáticamente.
+     Ambos requieren monitor conectado y estados recibidos en la conexión actual. Tras una reconexión esperan nuevas confirmaciones. Si el monitor pierde conexión no pueden continuar de forma fiable. Por sí solos no bloquean nada. Si además está activo «Bloquear automáticamente tras un minuto desbloqueado», la app solicita el bloqueo sin confirmación en pantalla tras ese minuto, con las cuatro puertas y el maletero confirmados cerrados y al menos 10 segundos desde su cierre. Los datos MQTT deben tener menos de dos minutos y se hace una lectura europea adicional justo antes de enviar la orden. No actúa con el coche en marcha, puertas abiertas o datos insuficientes; tampoco cierra ventanillas ni el maletero.
+
+     Los controles manuales tienen prioridad y aplazan un minuto el automático. La app comprueba ambas cerraduras antes de anunciar éxito y permite como máximo tres intentos por ciclo, separados al menos un minuto y condicionados a datos recientes. Si falla la autorización, la red o la confirmación, avisa y no afirma que el vehículo esté cerrado. No detecta una llave olvidada dentro. No garantiza el cierre permanente.
      """},
    {"8. Centinela básico", """
      El ajuste «Centinela básico» destaca cambios de apertura cuando el coche comunica aparcado y bloqueado. También puede destacar el paso de bloqueado a desbloqueado.
@@ -168,7 +170,7 @@ public final class HelpActivity extends SafeAreaActivity {
 
      No hay DVR, vídeo, cámara Centinela, detección de golpes ni detección de ocupantes por MQTT verificada. Las funciones que aparecen en los menús pueden depender de la compatibilidad del vehículo y de cambios en los servicios de Mazda.
 
-     Los avisos dependen del coche, Mazda, internet y Android. Mazda Avisos Lab no sustituye la app oficial ni una alarma y no garantiza recepción permanente. Las órdenes de control se envían cuando las solicitas y confirmas; los ajustes de notificaciones no envían órdenes al vehículo.
+     Los avisos dependen del coche, Mazda, internet y Android. Mazda Avisos Lab no sustituye la app oficial ni una alarma y no garantiza recepción permanente. Los controles manuales solicitan confirmación. El ajuste específico de cierre automático, junto al recordatorio de coche sin asegurar, autoriza órdenes de bloqueo sin confirmación en pantalla mientras el monitor está activo y las condiciones lo permitan. La copia del PIN destinada a esa automatización solo reside en memoria y se elimina al desactivar la función, detener el monitor o cerrar la sesión.
      """}
  };
  private LinearLayout topics;

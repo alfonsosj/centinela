@@ -38,6 +38,17 @@ jobs:
           printf '3cf6cd6892e32e2b4c1c39e0f52f5248a2f5b37646fdfbb79a66b46b618414ed  %s\n' "$discovery_tests/json.jar" | sha256sum --check
           javac --release 17 -cp "$discovery_tests/json.jar" -d "$discovery_tests/classes" app/src/main/java/es/retalis/mazdaavisos/FeatureDiscovery.java app/src/main/java/es/retalis/mazdaavisos/FeatureEvidence.java tests/feature-discovery/ControlSession.java tests/feature-discovery/AdvancedChecks.java
           java -cp "$discovery_tests/json.jar:$discovery_tests/classes" es.retalis.mazdaavisos.AdvancedChecks
+      - name: Verificar ventanillas y cierre automático con HTTPS simulado
+        shell: bash
+        run: |
+          set -euo pipefail
+          alert_tests="$RUNNER_TEMP/mazda-alert-tests"
+          test_json="$RUNNER_TEMP/mazda-discovery-tests/json.jar"
+          mkdir -p "$alert_tests/policy" "$alert_tests/remote"
+          javac --release 17 -cp "$test_json" -d "$alert_tests/policy" app/src/main/java/es/retalis/mazdaavisos/WindowAlertFilter.java app/src/main/java/es/retalis/mazdaavisos/AutoLockPolicy.java app/src/main/java/es/retalis/mazdaavisos/ControlCommandGate.java tests/alert-behavior/AlertBehaviorChecks.java
+          java -cp "$test_json:$alert_tests/policy" es.retalis.mazdaavisos.AlertBehaviorChecks
+          javac --release 17 -cp "$test_json" -d "$alert_tests/remote" app/src/main/java/es/retalis/mazdaavisos/AutoLockPolicy.java app/src/main/java/es/retalis/mazdaavisos/ControlCommandGate.java app/src/main/java/es/retalis/mazdaavisos/AutomaticLockController.java app/src/main/java/es/retalis/mazdaavisos/ControlSession.java app/src/main/java/es/retalis/mazdaavisos/MazdaRemoteApi.java tests/remote-lock/android/content/Context.java tests/remote-lock/android/os/SystemClock.java tests/remote-lock/android/util/Base64.java tests/remote-lock/RemoteApiTestStubs.java tests/remote-lock/RemoteLockChecks.java
+          java -cp "$test_json:$alert_tests/remote" es.retalis.mazdaavisos.RemoteLockChecks
       - name: Comprobar compilación sin distribuir firma debug
         run: gradle --no-daemon :app:assembleDebug
       - name: Restaurar clave estable desde GitHub Actions Secrets

@@ -19,7 +19,7 @@ public final class AlertSettingsActivity extends SafeAreaActivity {
    scroll.addView(root);setContentView(scroll);
    TextView title=new TextView(this);title.setText("CONFIGURAR AVISOS MAZDA");
    title.setTextSize(22);title.setTextColor(Color.rgb(22,48,75));root.addView(title);
-   explain("Los avisos se envían solo cuando Mazda comunica un cambio real al monitor. No requiere Home Assistant ni envía órdenes al vehículo.");
+   explain("Los avisos usan los estados que comunica Mazda. El cierre automático, si está activo junto al recordatorio de coche sin asegurar, también puede solicitar el bloqueo sin pedir confirmación en pantalla. No requiere Home Assistant.");
    section("Acceso a notificaciones");
    explain("Consulta el historial de avisos, revisa los permisos de Android y comprueba que puedes recibir notificaciones.");
    destination("Abrir notificaciones",NotificationsActivity.class);
@@ -31,9 +31,14 @@ public final class AlertSettingsActivity extends SafeAreaActivity {
    toggle("Apertura/cierre de puertas físicas",AlertRules.DOORS);
    toggle("Recordarme cada minuto si está aparcado y hay puertas abiertas o desbloqueado",AlertRules.PARKED_OPEN_REMINDER);
    explain("Con este ajuste activo, si MQTT confirma que el coche está aparcado y permanece una puerta abierta o el vehículo desbloqueado, recibirás un recordatorio tras el primer minuto y otro cada minuto mientras siga así. Se detiene al cerrar y bloquear; necesita el monitor MQTT conectado y datos del coche. No sustituye una alarma.");
+   toggle("Bloquear automáticamente tras un minuto desbloqueado",AlertRules.AUTO_LOCK);
+   explain("Actúa junto al recordatorio anterior: tras un minuto aparcado y desbloqueado solicita el bloqueo sin preguntarte. Requiere datos recientes de las cuatro puertas y del maletero cerrados, y espera 10 segundos desde el último cierre. Comprueba de nuevo el estado por Mazda antes de enviar la orden y confirma ambas cerraduras al terminar. Respeta las órdenes manuales y permite hasta tres intentos, separados al menos un minuto, mientras lleguen datos recientes.");
+   explain("Solo bloquea las cerraduras: no cierra físicamente puertas, ventanillas ni maletero. Guarda el PIN y la autorización únicamente en memoria mientras el monitor está activo y este ajuste está habilitado; los borra al desactivarlo, detener el monitor o cerrar la sesión. Necesita la autorización de Mazda, internet y el servicio Android. Si no puede confirmar el cierre, lo avisa. No detecta si has dejado la llave dentro ni garantiza que el coche quede siempre cerrado.");
+   explain(AutomaticLockController.authorizationStatus(this));
    toggle("Avisar cada minuto si el coche está bloqueado y alguna ventanilla abierta",AlertRules.LOCKED_WINDOW_REMINDER);
    explain("Recordatorio independiente: tras un minuto con el vehículo bloqueado y una o varias ventanillas abiertas, avisa cada minuto hasta que Mazda informe de que se han cerrado todas o el coche esté desbloqueado. Necesita el monitor MQTT activo y estados recibidos en la sesión actual.");
    toggle("Apertura/cierre de ventanas",AlertRules.WINDOWS);
+   explain("Filtra el movimiento automático del cristal al abrir una puerta sin marco: espera 10 segundos de apertura estable y, si recibe el estado de la puerta, otros 10 segundos desde su cierre. Una bajada y subida breves no producen avisos de apertura ni de cierre. Los recordatorios de ventanilla abierta usan también este filtro.");
    toggle("Apertura/cierre de maletero",AlertRules.TRUNK);
    toggle("Centinela básico (avisos destacados de aperturas)",AlertRules.SENTINEL);
    explain("Centinela básico: destaca aperturas solo cuando el coche comunica aparcado y bloqueado. Un desbloqueo se avisa al cambiar de bloqueado a desbloqueado. No detecta golpes, personas ni intrusiones y no sustituye una alarma.");
@@ -70,7 +75,10 @@ public final class AlertSettingsActivity extends SafeAreaActivity {
    CheckBox c=new CheckBox(this);c.setText(title);c.setTextSize(15);
    c.setChecked(AlertRules.enabled(this,key));
    c.setPadding(0,4,0,4);
-   c.setOnCheckedChangeListener((v,checked)->preferences.edit().putBoolean(key,checked).apply());
+   c.setOnCheckedChangeListener((v,checked)->{
+     preferences.edit().putBoolean(key,checked).apply();
+     if(AlertRules.AUTO_LOCK.equals(key)||AlertRules.PARKED_OPEN_REMINDER.equals(key))AutomaticLockController.settingsChanged(this);
+   });
    root.addView(c);
  }
  private void threshold(String title,String key,int min,int max,int increment,String suffix){

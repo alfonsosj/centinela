@@ -49,9 +49,44 @@ final class MazdaRemoteApi {
  private void say(String message){if(update!=null)update.accept(message);}
  static final class Result{
    final String message;
-   Result(String message){this.message=message;}
+   final boolean confirmed;
+   Result(String message){this(message,false);}
+   Result(String message,boolean confirmed){this.message=message;this.confirmed=confirmed;}
  }
  Result execute(ControlSession.State s,String pin,boolean unlock)throws Exception{
+   ControlCommandGate.GLOBAL.beginManual();
+   try{return executeDoors(s,pin,unlock,null);}finally{ControlCommandGate.GLOBAL.endManual();}
+ }
+ private static void requireAutomatic(java.util.function.BooleanSupplier permitted){
+   if(permitted!=null&&!permitted.getAsBoolean())throw new CancellationException();
+ }
+ Result lockAutomatically(ControlSession.State session,String pin,java.util.function.BooleanSupplier permitted)throws Exception{
+   if(permitted==null)throw new IllegalArgumentException("Falta política de cierre automático");
+   requireAutomatic(permitted);
+   JSONObject response=post(session,"/cma-app-car-condition/api/vehicle/condition/v2",allStatusRequest(session.vehicleId));
+   JSONObject data=response.optJSONObject("data");
+   if(data==null)throw new IOException("Falta estado actual");
+   VehicleSnapshot.observeApi(context,data);
+   JSONObject doors=data.optJSONObject("door");
+   Integer driver=AutoLockPolicy.code(doors,"driverLock",0,1),passenger=AutoLockPolicy.code(doors,"passengerLock",0,1);
+   requireAutomatic(permitted);
+   // Cross-check any physical door states included in this HTTPS response;
+   // the independent policy additionally requires all five fresh MQTT closures.
+   for(String key:new String[]{"driverDoor","passengerDoor","leftRearDoor","rightRearDoor","driver","passenger","leftRear","rightRear","trunk"}){
+     Integer value=AutoLockPolicy.code(doors,key,0,100);
+     if(value!=null&&value!=0)throw new CancellationException();
+   }
+   if(Integer.valueOf(0).equals(driver)&&Integer.valueOf(0).equals(passenger))
+     return new Result("Mazda confirma que ambas cerraduras ya están bloqueadas. No se ha repetido la orden.",true);
+   Integer parked=AutoLockPolicy.code(data.optJSONObject("vehicleStatus"),"status",1,2);
+   if(!Integer.valueOf(2).equals(parked)||!Integer.valueOf(1).equals(driver)||passenger==null)
+     throw new CancellationException();
+   requireAutomatic(permitted);
+   return executeDoors(session,pin,false,permitted);
+ }
+ private Result executeDoors(ControlSession.State s,String pin,boolean unlock,java.util.function.BooleanSupplier permitted)throws Exception{
+   if(permitted!=null&&unlock)throw new IllegalArgumentException("El cierre automático nunca desbloquea");
+   requireAutomatic(permitted);
    JSONObject check=post(s,"/cma-app-car-control/api/security-code/check-code",
      new JSONObject().put("safeCode",ConnectionTestActivity.encrypt(
        KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(Base64.decode(ConnectionTestActivity.SERVER_RSA,Base64.DEFAULT))),pin)));
@@ -74,6 +109,7 @@ final class MazdaRemoteApi {
    signature.update(canonical.getBytes(StandardCharsets.UTF_8));
    payload.put("sign",Base64.encodeToString(signature.sign(),Base64.DEFAULT));
    say("Enviando orden firmada de "+(unlock?"desbloqueo":"bloqueo")+"…");
+   requireAutomatic(permitted);
    JSONObject submitted=post(s,"/cma-app-car-control/api/control/doors",payload);
    JSONObject resultData=submitted.optJSONObject("data");
    String commandId=resultData==null?"":resultData.optString("commandId","");
@@ -102,11 +138,11 @@ final class MazdaRemoteApi {
          VehicleSnapshot.observeApi(context,data);
          JSONObject doors=data.optJSONObject("door");
          if(doors!=null){
-           int driver=doors.optInt("driverLock",-1);
-           int passenger=doors.optInt("passengerLock",-1);
+           Integer driver=AutoLockPolicy.code(doors,"driverLock",0,1);
+           Integer passenger=AutoLockPolicy.code(doors,"passengerLock",0,1);
            int expected=unlock?1:0;
-           if(driver==expected&&passenger==expected)
-             return new Result(unlock?"Puertas DESBLOQUEADAS: Mazda ha confirmado ambas cerraduras.":"Puertas BLOQUEADAS: Mazda ha confirmado ambas cerraduras.");
+           if(Integer.valueOf(expected).equals(driver)&&Integer.valueOf(expected).equals(passenger))
+             return new Result(unlock?"Puertas DESBLOQUEADAS: Mazda ha confirmado ambas cerraduras.":"Puertas BLOQUEADAS: Mazda ha confirmado ambas cerraduras.",true);
          }
        }
      }catch(Exception ignored){/* show awaiting status rather than inventing success */}
@@ -115,6 +151,10 @@ final class MazdaRemoteApi {
  }
 
  Result executeAdvanced(ControlSession.State s,String pin,String cmd,int temp,int chargeLimit,int seat)throws Exception{
+   ControlCommandGate.GLOBAL.beginManual();
+   try{return executeAdvancedInternal(s,pin,cmd,temp,chargeLimit,seat);}finally{ControlCommandGate.GLOBAL.endManual();}
+ }
+ private Result executeAdvancedInternal(ControlSession.State s,String pin,String cmd,int temp,int chargeLimit,int seat)throws Exception{
    boolean protectedCommand=protectedAction(cmd);
    String name,kind;
    boolean chargeControl=CHARGE_LIMIT.equals(cmd);
