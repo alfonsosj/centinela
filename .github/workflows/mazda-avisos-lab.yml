@@ -36,8 +36,9 @@ jobs:
           mkdir -p "$discovery_tests/classes"
           curl --fail --silent --show-error --location https://repo.maven.apache.org/maven2/org/json/json/20240303/json-20240303.jar --output "$discovery_tests/json.jar"
           printf '3cf6cd6892e32e2b4c1c39e0f52f5248a2f5b37646fdfbb79a66b46b618414ed  %s\n' "$discovery_tests/json.jar" | sha256sum --check
-          javac --release 17 -cp "$discovery_tests/json.jar" -d "$discovery_tests/classes" app/src/main/java/es/retalis/mazdaavisos/FeatureDiscovery.java app/src/main/java/es/retalis/mazdaavisos/FeatureEvidence.java tests/feature-discovery/ControlSession.java tests/feature-discovery/AdvancedChecks.java
+          javac --release 17 -cp "$discovery_tests/json.jar" -d "$discovery_tests/classes" app/src/main/java/es/retalis/mazdaavisos/FeatureDiscovery.java app/src/main/java/es/retalis/mazdaavisos/FeatureEvidence.java tests/feature-discovery/ControlSession.java tests/feature-discovery/AdvancedChecks.java tests/feature-discovery/FunctionConfigChecks.java
           java -cp "$discovery_tests/json.jar:$discovery_tests/classes" es.retalis.mazdaavisos.AdvancedChecks
+          java -cp "$discovery_tests/json.jar:$discovery_tests/classes" es.retalis.mazdaavisos.FunctionConfigChecks
       - name: Verificar ventanillas y cierre automático con HTTPS simulado
         shell: bash
         run: |

@@ -18,6 +18,7 @@ import javax.net.ssl.HttpsURLConnection;
 /** Read-only discovery. Regional credential use has a separate, explicit UI consent. */
 final class FeatureDiscovery {
  private static final String EUROPE="https://ca-m.iov.changanauto.com.de/user-apigw/vot-connect-conf-center/api/device/appGetCarConfFunc";
+ private static final String EUROPE_FUNCTIONS="https://cma-m.iov.changanauto.com.de/cma-app-gw/cma-app-user/api/vehicle/function-config";
  private static final String CHINA="https://m.iov.changan.com.cn/cm-apigw/vot-connect-conf-center/api/device/appGetCarConfFunc";
  private static final String[] NAMES={"Centinela de cámaras","Fotos interiores","Fotos exteriores / panorámica","Grabación / DVR","Aparcamiento remoto"};
  private static final String[][] MARKERS={
@@ -39,7 +40,7 @@ final class FeatureDiscovery {
  private static String normalized(String value){return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]","");}
  private void code(String value){
    // Codes describe functions, never accounts, topics, identifiers or tokens.
-   if(symbolic(value)==null)return;
+   value=symbolic(value);if(value==null)return;
    if(codes.size()<160)codes.add(value);else limited=true;
    marker(value);
  }
@@ -60,7 +61,11 @@ final class FeatureDiscovery {
    for(String key:new String[]{"applicationFuncCode","serviceCode","attrCode","functionCode","funcCode"}){
      label=symbolic(object.opt(key));if(label!=null)break;
    }
-   if(label==null)return;
+   if(label==null){
+     String orphan=symbolic(object.opt("commandCode"));
+     if(orphan==null)return;
+     label="Mando sin función asociada";marker(orphan);
+   }
    StringBuilder entry=new StringBuilder(label);
    Object command=object.opt("commandCode");
    if(command!=null&&command!=JSONObject.NULL&&!String.valueOf(command).trim().isEmpty()&&
@@ -89,6 +94,18 @@ final class FeatureDiscovery {
      JSONObject o=(JSONObject)node;metadata(o);Iterator<String> keys=o.keys();
      while(keys.hasNext()&&visited<=12000){
        String key=keys.next();Object value=o.opt(key);
+       // Native function-config uses primitive codes in confList, not objects.
+       // Arbitrary arrays of accounts, topics or other strings are not codes.
+       if(key.equals("confList")&&value instanceof JSONArray){
+         JSONArray list=(JSONArray)value;
+         for(int i=0;i<list.length()&&visited<=12000;i++){
+           Object item=list.opt(i);visited++;
+           if(item instanceof String)code((String)item);
+           else if(item instanceof JSONObject||item instanceof JSONArray)visit(item,depth+1);
+         }
+         if(visited>12000)limited=true;
+         continue;
+       }
        if(key.equals("applicationFuncCode")||key.equals("serviceCode")||key.equals("attrCode")||
           key.equals("functionCode")||key.equals("funcCode")){
          if(value instanceof String)code((String)value);
@@ -127,10 +144,48 @@ final class FeatureDiscovery {
  }
  static String europe(ControlSession.State session)throws Exception{
    if(session==null||ControlSession.get()!=session)throw new IOException("Autentica la cuenta Mazda antes de leer las funciones.");
-   JSONObject response=request(EUROPE,new JSONObject().put("carId",session.vehicleId),session);
-   if(!response.optBoolean("success",false))throw new IOException("Europa rechazó la lectura ("+safeCode(response)+").");
-   if(!response.has("data")||response.isNull("data"))throw new IOException("Europa respondió sin configuración de funciones. No se puede concluir compatibilidad.");
-   return redactSession(analyze(response.opt("data")),session);
+   Source cloud=readEurope(session,false),nativeApp=readEurope(session,true);
+   StringBuilder out=new StringBuilder("COMPARACIÓN DE DOS LISTAS EUROPEAS\n");
+   out.append(DateFormat.getDateTimeInstance().format(new Date())).append("\n\n");
+   out.append("Se consultan por separado la configuración de comunicación del coche (TSP/MQTT) y las funciones de la aplicación europea (function-config / confList). La prueba anterior solo leía la primera.\n\n");
+   out.append("1. Comunicación TSP/MQTT: ").append(cloud.status).append('\n');
+   out.append("2. Funciones de la app europea: ").append(nativeApp.status).append("\n\n");
+   if(cloud.data!=null&&nativeApp.data!=null){
+     TreeSet<String> shared=new TreeSet<>(cloud.scan.codes);shared.retainAll(nativeApp.scan.codes);
+     TreeSet<String> nativeOnly=new TreeSet<>(nativeApp.scan.codes);nativeOnly.removeAll(cloud.scan.codes);
+     TreeSet<String> cloudOnly=new TreeSet<>(cloud.scan.codes);cloudOnly.removeAll(nativeApp.scan.codes);
+     out.append("Códigos con el mismo nombre en ambas: ").append(shared.size()).append("\n");
+     out.append("Solo en funciones de la app europea: ").append(nativeOnly.size()).append("\n");
+     for(String code:nativeOnly)out.append("• ").append(code).append('\n');
+     out.append("Solo en comunicación TSP/MQTT: ").append(cloudOnly.size()).append("\n\n");
+     out.append("Las fuentes pueden usar vocabularios distintos. Una diferencia no demuestra bloqueo regional ni una función oculta. Los inventarios completos aparecen debajo.\n\n");
+   }else out.append("No se pueden comparar las listas completas porque falta una respuesta utilizable. Una consulta fallida no equivale a cero funciones.\n\n");
+   if(cloud.data!=null)out.append(analyze(cloud.data,"CONFIGURACIÓN EUROPEA DE COMUNICACIÓN TSP/MQTT")).append("\n\n");
+   if(nativeApp.data!=null)out.append(analyze(nativeApp.data,"FUNCIONES DECLARADAS POR LA APP EUROPEA · confList")).append("\n\n");
+   out.append("Esta comparación no cambia la configuración del coche ni envía órdenes. No envía datos a China. Una mención no habilita la función ni demuestra hardware compatible.");
+   return redactSession(out.toString(),session);
+ }
+ private static final class Source {
+   final Object data;final FeatureDiscovery scan;final String status;
+   Source(Object data,String error){
+     this.data=data;scan=new FeatureDiscovery();if(data!=null)scan.visit(data,0);
+     status=data==null?error:"lectura correcta; "+scan.codes.size()+" códigos legibles"+(scan.limited?" (inventario parcial).":".");
+   }
+ }
+ private static Source readEurope(ControlSession.State session,boolean nativeApp){
+   try{
+     if(ControlSession.get()!=session)return new Source(null,"sesión caducada; no se ha consultado.");
+     Object id=session.vehicleId;
+     if(nativeApp&&session.vehicleId.matches("[1-9][0-9]{0,17}|0"))id=Long.valueOf(session.vehicleId);
+     JSONObject body=new JSONObject().put(nativeApp?"vehicleId":"carId",id);
+     JSONObject response=request(nativeApp?EUROPE_FUNCTIONS:EUROPE,body,session);
+     if(!response.optBoolean("success",false))return new Source(null,"rechazada; código "+safeCode(response)+".");
+     Object data=response.opt("data");
+     if(!(data instanceof JSONObject)&&!(data instanceof JSONArray))return new Source(null,"éxito sin lista de configuración utilizable.");
+     if(nativeApp&&(!(data instanceof JSONObject)||!(((JSONObject)data).opt("confList") instanceof JSONArray)))
+       return new Source(null,"éxito sin una lista confList reconocible; no se interpreta como ausencia de funciones.");
+     return new Source(data,null);
+   }catch(Exception error){return new Source(null,connectionError(error));}
  }
  static String china()throws Exception{
    // Deliberately anonymous: different authentication, no token or car identifier.
@@ -198,7 +253,9 @@ final class FeatureDiscovery {
    return request(destination,body,session,false);
  }
  private static JSONObject request(String destination,JSONObject body,ControlSession.State session,boolean regionalConsent)throws Exception{
-   boolean european=EUROPE.equals(destination)&&session!=null&&!regionalConsent;
+   boolean european=session!=null&&!regionalConsent&&ControlSession.get()==session&&body.length()==1&&
+     (EUROPE.equals(destination)&&session.vehicleId.equals(body.optString("carId"))||
+      EUROPE_FUNCTIONS.equals(destination)&&session.vehicleId.equals(body.optString("vehicleId")));
    boolean anonymous=CHINA.equals(destination)&&session==null&&!regionalConsent&&body.length()==0;
    boolean regional=CHINA.equals(destination)&&session!=null&&regionalConsent&&ControlSession.get()==session&&
      body.length()==2&&session.vehicleId.equals(body.optString("carId"))&&
@@ -215,9 +272,9 @@ final class FeatureDiscovery {
      connection.setRequestProperty("language","en_US");connection.setRequestProperty("accept-language","en-US;q=1.0");
      connection.setRequestProperty("user-agent","overseas/1.2.3 (com.mazda.mazda6e; build:1; iOS 27.0.0) Alamofire/5.5.0");
      connection.setRequestProperty("deviceid",session.deviceId);connection.setRequestProperty("authorization",session.token);
-     connection.setRequestProperty("X-Tsp-User-Token",session.token.substring(session.token.lastIndexOf('|')+1));
+     if(EUROPE.equals(destination))connection.setRequestProperty("X-Tsp-User-Token",session.token.substring(session.token.lastIndexOf('|')+1));
    }else{
-     connection.setRequestProperty("user-agent","MazdaAvisos-ReadOnlyProbe/1.1.11");
+     connection.setRequestProperty("user-agent","MazdaAvisos-ReadOnlyProbe/1.1.13");
      connection.setRequestProperty("vcs-app-id","chang-ma");
      if(regional)connection.setRequestProperty("X-VCS-User-Token",body.getString("token"));
    }

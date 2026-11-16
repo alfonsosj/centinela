@@ -69,3 +69,20 @@ No se ha ejecutado la cuarta prueba en el entorno de desarrollo, que no dispone 
 ### Validación
 
 El arnés Java `tests/feature-discovery/AdvancedChecks.java` utiliza conexiones HTTPS simuladas, sin cuentas ni peticiones reales. Comprueba rechazo previo a HTTP de destinos, vehículos y credenciales no permitidos; cuerpo restringido a identificador propio y token; ausencia de cabeceras europeas de autorización/dispositivo en China; dos intentos como máximo; detención ante error TLS o sesión caducada; exclusión de datos privados en el informe; conservación de valores 0 sin declararlos activos; reinicio del inventario; y límites de tamaño/profundidad. Se ejecuta también en el workflow antes de compilar y firmar. Estas pruebas no validan el backend chino ni el comportamiento físico del vehículo.
+
+
+## Segunda lista europea y corrección del lector — 16 de noviembre de 2026
+
+La investigación identificó una consulta distinta de la configuración de comunicación ya usada. La integración pública `fano0001/home-assistant-mazda-6e`, en `async_get_function_config`, consulta para Europa `cma-app-user/api/vehicle/function-config` con `vehicleId` y lee `data.confList`. Su ruta de configuración MQTT, por separado, sigue utilizando `appGetCarConfFunc` con `carId` y la cabecera TSP.
+
+Fuente primaria del cliente de referencia, fijada a la revisión inspeccionada: https://github.com/fano0001/home-assistant-mazda-6e/blob/44f96484ca68e21de61cd70f5f79a980d2a49f47/custom_components/mazda_6e/api.py . Es una implementación no oficial; no una garantía de funcionamiento en el vehículo del propietario. La adaptación de Mazda Avisos usa código propio y no incluye el código del cliente de referencia.
+
+El diagnóstico 1.1.12 solo consultaba la lista TSP/MQTT. Además, el lector ignoraba los códigos primitivos de `confList` y los descriptores de mando sin un código funcional asociado. Por tanto, la lectura de 92 códigos aportada por el propietario no agotaba todas las fuentes identificadas y no permite concluir ausencia de funciones en el vehículo.
+
+La versión 1.1.13 consulta las dos fuentes europeas y conserva su procedencia. Compara nombres comunes y exclusivos, sin presumir que dos nombres diferentes describan funciones diferentes ni que un código active una función. Si una lectura falla o no devuelve el esquema esperado, sigue mostrando la otra y marca la comparación como incompleta. No migra la cuenta, modifica la vinculación ni envía órdenes.
+
+Las restricciones de destino permiten solo las dos rutas europeas de lectura con el vehículo de la sesión actual y su clave de cuerpo correspondiente. El token TSP no se adjunta a la nueva consulta del servicio europeo de usuario. Se conservan TLS, ausencia de redirecciones, límites de respuesta y redacción de credenciales/identificadores. La prueba china mantiene su consentimiento separado.
+
+La segunda inspección del APK chino volvió a obtener el mismo fichero Android v1.0.72 y SHA-256 documentado arriba. Los recursos legibles siguen mostrando el puente nativo para `setSentryMode`, la dependencia de configuración y `commandCode` para fotos y el canal Bluetooth de APA. No se obtuvo una equivalencia demostrada entre esos nombres de interfaz y una orden europea de cámaras. No se ejecutó la app oficial ni se enviaron órdenes. No hay un desbloqueo confirmado de Centinela, cámaras, DVR o aparcamiento remoto.
+
+`FunctionConfigChecks` verifica con HTTPS simulado las dos estructuras, los nombres de campo `carId`/`vehicleId`, la separación de cabeceras, códigos planos y mandos sin asociación, errores parciales, esquema desconocido y sesión caducada. Las pruebas anteriores de privacidad y control automático se mantienen en Actions. Falta la respuesta real de la nueva comparación desde el móvil del propietario y el resultado de la prueba regional opcional; no están disponibles en el entorno de desarrollo.

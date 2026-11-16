@@ -1,5 +1,15 @@
 # Mazda Avisos Lab
 
+## 1.1.13 — Comparación de las dos listas europeas de funciones
+
+- Añade la consulta europea `cma-app-user/api/vehicle/function-config` (`vehicleId`) al diagnóstico TSP/MQTT existente (`carId`). No envía datos a China ni órdenes al vehículo para esta comparación.
+- Corrige el lector para reconocer `confList` como lista de códigos de texto y conservar indicios de `commandCode` aunque falte un código funcional asociado.
+- Compara nombres por fuente sin asumir equivalencia de vocabularios, habilitación o hardware. Los fallos, respuestas sin datos y esquemas desconocidos se muestran como incompletos, conservando la lista válida de la otra fuente.
+- Cabeceras y cuerpos restringidos por destino; la credencial TSP solo se utiliza en su servicio. Las dos consultas requieren la sesión europea actual.
+- Pruebas nuevas de ambas respuestas, redacción de credenciales, aislamiento de cabeceras, límites, errores parciales y sesión caducada. No se ha verificado una activación china en el coche del propietario.
+- `versionCode 36`, misma firma estable; conserva las funciones de la 1.1.12.
+
+
 ## 1.1.12 — Ventanillas sin marco y cierre automático
 
 - Filtra aperturas breves del cristal al abrir puertas: confirma la apertura tras 10 segundos estables y tras el cierre de la puerta cuando se conoce. Suprime también el cierre de una apertura breve descartada.

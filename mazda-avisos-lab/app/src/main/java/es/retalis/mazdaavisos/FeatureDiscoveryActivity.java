@@ -33,8 +33,8 @@ public final class FeatureDiscoveryActivity extends SafeAreaActivity {
    root.addView(text("Investigamos Centinela, cámaras, DVR y aparcamiento. Todas las pruebas de esta pantalla son de lectura. La app china incluye estas funciones, pero su presencia no confirma que estén habilitadas en tu CX-6e europeo.",15));
    sessionStatus=text("",14);root.addView(sessionStatus);
    button(root,"Conectar / autenticar mi cuenta Mazda",()->startActivity(new Intent(this,ConnectionTestActivity.class)));
-   checks.add(button(root,"1. Leer funciones y códigos de mando",()->runCheck(0)));
-   root.addView(text("Consulta europea: busca funciones, códigos de mando y marcas de disponibilidad. Los valores se muestran sin asumir que permiten activar la función.",14));
+   checks.add(button(root,"1. Comparar las dos listas europeas",()->runCheck(0)));
+   root.addView(text("Lee la configuración de comunicación y una segunda lista de funciones de la app europea que no se consultaba antes. Compara los códigos y busca cámaras, Centinela, DVR y aparcamiento sin asumir que una mención permita activarlos. Una lectura fallida se muestra como incompleta.",14));
    checks.add(button(root,"2. Buscar rastros en los datos del coche",()->runCheck(1)));
    root.addView(text("Actualiza el estado por el servicio europeo y revisa los campos recibidos por HTTPS y MQTT desde la última autenticación. Deja el monitor activo unos minutos y repite esta prueba para ampliar la observación.",14));
    checks.add(button(root,"3. Comprobar China sin credenciales",()->runCheck(2)));
